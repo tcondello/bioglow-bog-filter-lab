@@ -369,15 +369,21 @@
       },
       microscope: false,
       showArrows: true,
+      activePreset: null,      // 'weather' | 'stream' | 'suction' | 'multistage' | 'organisms' | null
       // Dynamic lake metrics (0..100)
       dirt: 22,                // lower is cleaner
       ammonia: 18,             // lower is safer
       oxygen: 84,              // higher is better
       pumpActive: true,
-      effectiveFlow: 0.7,      // 0..1.2
+      onBattery: false,
+      weakSolar: false,
+      effectiveFlow: 0.85,     // 0..1.25
       solarOutput: 100,        // 0..100
       time: 0,
+      flowPhase: 0,            // monotonic accumulator so pipes/impeller never spin backwards
+      solarPhase: 0,           // monotonic accumulator for solar wire pulses
       suctionWarningTimer: 0,
+      suctionWarningType: 'none', // 'none' | 'open' | 'baby'
     };
 
     // Canvas setup
@@ -398,11 +404,25 @@
     resizeCanvas();
 
     // Entities
-    const axolotls = [
-      { x: 0.22, y: 0.72, vx: 0.0005, vy: 0.0001, dir: 1, size: 1.0, color: '#f9a8d4', gillColor: '#f43f5e', phase: 0, stressed: false },
-      { x: 0.42, y: 0.80, vx: -0.0004, vy: -0.0001, dir: -1, size: 0.85, color: '#fbcfe8', gillColor: '#ec4899', phase: 2.1, stressed: false },
-      { x: 0.15, y: 0.86, vx: 0.00035, vy: 0.00005, dir: 1, size: 0.62, color: '#fde68a', gillColor: '#f59e0b', phase: 4.0, stressed: false, baby: true },
+    const INITIAL_AXOLOTLS = [
+      { x: 0.22, y: 0.72, vx: 0.0005, vy: 0.0001, dir: 1, size: 1.0, color: '#f9a8d4', gillColor: '#f43f5e', phase: 0, stressed: false, baby: false },
+      { x: 0.42, y: 0.80, vx: -0.0004, vy: -0.0001, dir: -1, size: 0.85, color: '#fbcfe8', gillColor: '#ec4899', phase: 2.1, stressed: false, baby: false },
+      { x: 0.18, y: 0.85, vx: 0.00035, vy: 0.00005, dir: 1, size: 0.62, color: '#fde68a', gillColor: '#f59e0b', phase: 4.0, stressed: false, baby: true },
     ];
+    let axolotls = INITIAL_AXOLOTLS.map(a => ({ ...a }));
+
+    function resetAxolotls(nearIntake = false) {
+      axolotls = INITIAL_AXOLOTLS.map(a => ({ ...a }));
+      if (nearIntake) {
+        // Position one adult & baby closer to the intake so suction risk is immediately visible
+        axolotls[1].x = 0.45;
+        axolotls[1].y = 0.82;
+        axolotls[1].vx = 0.0003;
+        axolotls[2].x = 0.39;
+        axolotls[2].y = 0.85;
+        axolotls[2].vx = 0.0003;
+      }
+    }
 
     const particles = [];
     const raindrops = Array.from({ length: 55 }, () => ({
@@ -422,14 +442,12 @@
       twinkle: Math.random() * Math.PI * 2,
     }));
 
-    function spawnInitialParticles() {
+    function spawnInitialParticles(dirtCount = 12, ammoCount = 10, oxyCount = 16) {
       particles.length = 0;
-      for (let i = 0; i < 42; i++) {
-        particles.push(createLakeParticle());
-      }
-      for (let i = 0; i < 24; i++) {
-        particles.push(createBogParticle());
-      }
+      for (let i = 0; i < dirtCount; i++) particles.push(createLakeParticle('dirt'));
+      for (let i = 0; i < ammoCount; i++) particles.push(createLakeParticle('ammonia'));
+      for (let i = 0; i < oxyCount; i++) particles.push(createLakeParticle('oxygen'));
+      for (let i = 0; i < 20; i++) particles.push(createBogParticle());
     }
 
     function createLakeParticle(forceType) {
@@ -438,8 +456,8 @@
       return {
         zone: 'lake',
         type,
-        x: 0.04 + Math.random() * 0.52,
-        y: 0.52 + Math.random() * 0.40,
+        x: 0.04 + Math.random() * 0.50,
+        y: 0.52 + Math.random() * 0.38,
         vx: (Math.random() - 0.5) * 0.0008,
         vy: (Math.random() - 0.5) * 0.0005,
         r: type === 'dirt' ? 3.2 : type === 'ammonia' ? 2.8 : 2.6,
@@ -452,7 +470,7 @@
         zone: 'bog',
         type: Math.random() < 0.5 ? 'dirt' : 'ammonia',
         x: 0.67 + Math.random() * 0.27,
-        y: 0.58 + Math.random() * 0.28,
+        y: 0.50 + Math.random() * 0.35,
         vy: -0.0012,
         r: 2.8,
         cleaned: false,
@@ -500,49 +518,51 @@
       btnReset: document.getElementById('btn-reset'),
     };
 
-    // --- Event Listeners ---
-    document.querySelectorAll('.weather-btn').forEach(btn => {
-      btn.addEventListener('click', () => setWeather(btn.dataset.weather));
-    });
+    // --- Power & Flow Evaluation (used both immediately on clicks and every frame) ---
+    function evaluatePowerState(dt) {
+      const solarMap = { sunny: 100, cloudy: 45, rainy: 20, night: 0 };
+      state.solarOutput = solarMap[state.weather];
 
-    document.querySelectorAll('.guard-btn').forEach(btn => {
-      btn.addEventListener('click', () => setGuard(btn.dataset.guard));
-    });
+      const demandMap = { 1: 25, 2: 45, 3: 75 };
+      const pumpDemand = demandMap[state.flowSetting];
 
-    el.btnBattery.addEventListener('click', () => {
-      state.batteryEnabled = !state.batteryEnabled;
-      syncControlsUI();
-    });
+      state.onBattery = false;
+      state.weakSolar = false;
 
-    el.flowSlider.addEventListener('input', (e) => {
-      state.flowSetting = Number(e.target.value);
-      syncControlsUI();
-    });
-
-    el.chkGravel.addEventListener('change', () => { state.layers.gravel = el.chkGravel.checked; updateInsight(); });
-    el.chkBacteria.addEventListener('change', () => { state.layers.bacteria = el.chkBacteria.checked; updateInsight(); });
-    el.chkPlants.addEventListener('change', () => { state.layers.plants = el.chkPlants.checked; updateInsight(); });
-
-    el.btnMicroscope.addEventListener('click', () => {
-      state.microscope = !state.microscope;
-      syncControlsUI();
-    });
-
-    el.btnArrows.addEventListener('click', () => {
-      state.showArrows = !state.showArrows;
-      syncControlsUI();
-    });
-
-    el.btnPollute.addEventListener('click', () => {
-      state.dirt = Math.min(100, state.dirt + 38);
-      state.ammonia = Math.min(100, state.ammonia + 32);
-      for (let i = 0; i < 16; i++) {
-        particles.push(createLakeParticle(i % 2 === 0 ? 'dirt' : 'ammonia'));
+      if (state.solarOutput >= pumpDemand) {
+        state.pumpActive = true;
+        if (state.batteryEnabled && dt > 0) {
+          state.batteryLevel = Math.min(100, state.batteryLevel + (state.solarOutput - pumpDemand) * 0.0022 * dt * 60);
+        }
+      } else {
+        const deficit = pumpDemand - state.solarOutput;
+        if (state.batteryEnabled && state.batteryLevel > 0.5) {
+          state.pumpActive = true;
+          state.onBattery = true;
+          if (dt > 0) {
+            state.batteryLevel = Math.max(0, state.batteryLevel - deficit * 0.0025 * dt * 60);
+          }
+        } else if (state.solarOutput >= 20) {
+          state.pumpActive = true;
+          state.weakSolar = true;
+        } else {
+          state.pumpActive = false;
+        }
       }
-      updateInsight('🌧️', 'Muddy runoff just entered the lake! Watch the pump pull dirty water into the bog filter so the gravel, bacteria, and plants can clean it back up.');
-    });
 
-    el.btnReset.addEventListener('click', () => {
+      let targetFlow = 0;
+      if (state.pumpActive) {
+        const base = state.flowSetting === 1 ? 0.45 : state.flowSetting === 2 ? 0.85 : 1.25;
+        const powerRatio = (state.batteryEnabled && state.batteryLevel > 0.5)
+          ? 1
+          : Math.min(1, state.solarOutput / pumpDemand);
+        targetFlow = base * powerRatio;
+      }
+      return targetFlow;
+    }
+
+    // --- Clean Baseline Reset (prevents state bleed across presets & Reset Lab) ---
+    function resetToBaseline({ snapFlow = true, nearIntake = false, dirt = 22, ammonia = 18, oxygen = 84 } = {}) {
       state.weather = 'sunny';
       state.batteryEnabled = true;
       state.batteryLevel = 85;
@@ -551,70 +571,156 @@
       state.layers = { gravel: true, bacteria: true, plants: true };
       state.microscope = false;
       state.showArrows = true;
-      state.dirt = 22;
-      state.ammonia = 18;
-      state.oxygen = 84;
-      spawnInitialParticles();
+      state.dirt = dirt;
+      state.ammonia = ammonia;
+      state.oxygen = oxygen;
+      state.suctionWarningTimer = 0;
+      state.suctionWarningType = 'none';
+      customInsightTimer = 0;
+      resetAxolotls(nearIntake);
+      spawnInitialParticles(Math.round(dirt * 0.45), Math.round(ammonia * 0.45), 16);
+      const targetFlow = evaluatePowerState(0);
+      if (snapFlow) state.effectiveFlow = targetFlow;
+    }
+
+    // Helper for manual control changes: clear active preset highlight & stale custom banner
+    function onManualChange() {
+      state.activePreset = null;
+      customInsightTimer = 0;
+      evaluatePowerState(0);
       syncControlsUI();
+      updateMetricsUI(axolotls.some(a => a.stressed));
+    }
+
+    // --- Event Listeners ---
+    document.querySelectorAll('.weather-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.weather = btn.dataset.weather;
+        onManualChange();
+      });
     });
 
-    // Whiteboard Question Presets
+    document.querySelectorAll('.guard-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.guard = btn.dataset.guard;
+        state.suctionWarningTimer = 0;
+        state.suctionWarningType = 'none';
+        if (state.guard === 'screen') {
+          axolotls.forEach(a => { a.stressed = false; a.vx *= 0.4; a.vy *= 0.4; });
+        }
+        onManualChange();
+      });
+    });
+
+    el.btnBattery.addEventListener('click', () => {
+      state.batteryEnabled = !state.batteryEnabled;
+      onManualChange();
+    });
+
+    el.flowSlider.addEventListener('input', (e) => {
+      state.flowSetting = Number(e.target.value);
+      if (state.flowSetting < 3) {
+        axolotls.forEach(a => { a.stressed = false; });
+      }
+      onManualChange();
+    });
+
+    el.chkGravel.addEventListener('change', () => { state.layers.gravel = el.chkGravel.checked; onManualChange(); });
+    el.chkBacteria.addEventListener('change', () => { state.layers.bacteria = el.chkBacteria.checked; onManualChange(); });
+    el.chkPlants.addEventListener('change', () => { state.layers.plants = el.chkPlants.checked; onManualChange(); });
+
+    el.btnMicroscope.addEventListener('click', () => {
+      state.microscope = !state.microscope;
+      onManualChange();
+    });
+
+    el.btnArrows.addEventListener('click', () => {
+      state.showArrows = !state.showArrows;
+      onManualChange();
+    });
+
+    el.btnPollute.addEventListener('click', () => {
+      state.activePreset = null;
+      state.dirt = Math.min(100, state.dirt + 38);
+      state.ammonia = Math.min(100, state.ammonia + 32);
+      // Remove excess oxygen particles if needed so new dirt/ammonia are always visible
+      for (let i = 0; i < 16; i++) {
+        particles.push(createLakeParticle(i % 2 === 0 ? 'dirt' : 'ammonia'));
+      }
+      syncControlsUI();
+      updateMetricsUI(axolotls.some(a => a.stressed));
+      updateInsight('🌧️', 'Muddy runoff just entered the lake! Watch the pump pull dirty water into the bog filter so the gravel, bacteria, and plants can clean it back up.');
+    });
+
+    el.btnReset.addEventListener('click', () => {
+      state.activePreset = null;
+      resetToBaseline({ snapFlow: true });
+      syncControlsUI();
+      updateMetricsUI(false);
+    });
+
+    // Whiteboard Question Presets (each starts from a clean baseline so no old state bleeds in!)
     document.querySelectorAll('.preset-card').forEach(card => {
       card.addEventListener('click', () => {
         const p = card.dataset.preset;
+        state.activePreset = p;
+
         if (p === 'weather') {
-          setWeather('night');
+          resetToBaseline({ snapFlow: true });
+          state.weather = 'night';
           state.batteryEnabled = true;
-          state.batteryLevel = Math.max(state.batteryLevel, 65);
+          state.batteryLevel = 78;
+          state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
+          updateMetricsUI(false);
           updateInsight('🌙', 'Nighttime Test! Solar output dropped to 0%, but your Battery Backup kicked in automatically so the bog filter keeps protecting the axolotls. Try turning Battery OFF to see what happens!');
         } else if (p === 'stream') {
-          setWeather('sunny');
+          resetToBaseline({ snapFlow: true });
+          state.weather = 'sunny';
           state.flowSetting = 2;
           state.showArrows = true;
+          state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
+          updateMetricsUI(false);
           updateInsight('🔄', 'Follow the blue arrows! Dirty lake water enters the screened intake pipe on the bottom, rises up through the bog filter, and flows back out as a gentle stream that adds fresh oxygen.');
         } else if (p === 'suction') {
-          setWeather('sunny');
-          setGuard('none');
+          resetToBaseline({ snapFlow: true, nearIntake: true });
+          state.weather = 'sunny';
+          state.guard = 'none';
           state.flowSetting = 2;
+          state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
+          updateMetricsUI(true);
           updateInsight('⚠️', 'Uh-oh! With an open pipe and no guard, the pump suction pulls curious axolotls toward the intake! Switch back to "Fine Screen + Small Tube" to keep them safe.');
         } else if (p === 'multistage') {
-          setWeather('sunny');
-          setGuard('screen');
+          resetToBaseline({ snapFlow: true, dirt: 54, ammonia: 50 });
+          state.weather = 'sunny';
+          state.guard = 'screen';
           state.microscope = true;
           state.layers = { gravel: true, bacteria: true, plants: true };
-          state.dirt = Math.max(state.dirt, 50);
-          state.ammonia = Math.max(state.ammonia, 48);
+          state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
+          updateMetricsUI(false);
           updateInsight('🔬', 'Microscope Mode ON! Look inside the bog filter: brown dirt gets trapped in the gravel, glowing green bacteria convert toxic amber ammonia into nutrients, and plant roots absorb them!');
         } else if (p === 'organisms') {
-          setWeather('sunny');
-          setGuard('screen');
+          resetToBaseline({ snapFlow: true });
+          state.weather = 'sunny';
+          state.guard = 'screen';
           state.flowSetting = 3;
+          state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
+          updateMetricsUI(true);
           updateInsight('🦎', 'Notice how "Turbo" flow stresses the axolotls! Wild axolotls live in calm canals (like Lake Xochimilco). A gentle-to-medium stream gives them clean, oxygenated water without pushing them around.');
         }
       });
     });
-
-    function setWeather(w) {
-      state.weather = w;
-      syncControlsUI();
-    }
-
-    function setGuard(g) {
-      state.guard = g;
-      syncControlsUI();
-    }
 
     let customInsightTimer = 0;
     function updateInsight(icon, text) {
       if (icon && text) {
         el.insightIcon.textContent = icon;
         el.insightText.textContent = text;
-        customInsightTimer = 360;
+        customInsightTimer = 420;
         return;
       }
       if (customInsightTimer > 0) return;
@@ -625,7 +731,10 @@
       } else if (state.guard === 'none') {
         el.insightIcon.textContent = '⚠️';
         el.insightText.textContent = 'Warning: Open intake pipe! Suction can pull axolotls toward the tube. Add a fine screen or grating to protect lake wildlife.';
-      } else if (state.flowSetting === 3) {
+      } else if (state.guard === 'grating') {
+        el.insightIcon.textContent = '🛡️';
+        el.insightText.textContent = 'Metal grating keeps adult axolotls safe, but tiny baby axolotls can still feel strong suction near the gaps. A fine mesh screen + small tube protects everyone!';
+      } else if (state.flowSetting === 3 && state.effectiveFlow > 0.8) {
         el.insightIcon.textContent = '💨';
         el.insightText.textContent = 'Flow is on Turbo! Strong currents stress axolotls and push water through the bog filter too fast for bacteria to finish cleaning ammonia.';
       } else if (!state.layers.gravel || !state.layers.bacteria || !state.layers.plants) {
@@ -635,11 +744,14 @@
         if (!state.layers.plants) missing.push('Wetland Plants (nutrient absorber)');
         el.insightIcon.textContent = '🧪';
         el.insightText.textContent = `Experimenting with missing filter layers (${missing.join(', ')})! Notice how using multiple filtering methods together cleans the lake much better than any single layer alone.`;
-      } else if (state.weather === 'night' || state.weather === 'rainy') {
+      } else if (state.weakSolar) {
+        el.insightIcon.textContent = '⛅';
+        el.insightText.textContent = 'With Battery Backup OFF in low sunlight, the pump can only trickle slowly. Turn Battery Backup ON to keep full, steady filtration!';
+      } else if (state.onBattery) {
         el.insightIcon.textContent = '🔋';
         el.insightText.textContent = state.weather === 'rainy'
           ? 'Rainy weather lowers solar power and adds muddy runoff, but your Battery Backup keeps the pump running and the bog filter catches the extra dirt!'
-          : 'No sunlight at night, so the Battery Backup is powering the pump! Tomorrow’s sun will recharge it.';
+          : 'Sunlight is too low for the pump alone, so your Battery Backup is supplying steady power! Sunny weather will recharge it.';
       } else {
         el.insightIcon.textContent = '✨';
         el.insightText.textContent = 'Everything is in balance! Solar energy powers the pump & charges the battery, the fine screen protects axolotls, all 3 bog filter layers clean the water, and the return stream adds oxygen.';
@@ -710,50 +822,37 @@
           : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]'
       }`;
 
+      // Highlight active Whiteboard Question preset card
+      document.querySelectorAll('.preset-card').forEach(card => {
+        const active = card.dataset.preset === state.activePreset;
+        card.className = `preset-card pill-btn text-left p-3.5 rounded-xl border flex flex-col justify-between gap-2 ${
+          active
+            ? 'border-[var(--primary)] bg-[var(--card)] ring-2 ring-[var(--primary)]/30'
+            : 'border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)]'
+        }`;
+      });
+
       updateInsight();
     }
 
     // --- Simulation Physics & Ecology Step ---
+    let uiTickAccumulator = 0;
     function stepSimulation(dt) {
+      const step = dt * 60; // normalize to 60fps so 120Hz screens run at same speed
       state.time += dt;
-      if (customInsightTimer > 0) customInsightTimer--;
+      if (customInsightTimer > 0) customInsightTimer = Math.max(0, customInsightTimer - step);
 
-      const solarMap = { sunny: 100, cloudy: 45, rainy: 20, night: 0 };
-      state.solarOutput = solarMap[state.weather];
+      const targetFlow = evaluatePowerState(dt);
+      state.effectiveFlow += (targetFlow - state.effectiveFlow) * Math.min(1, 0.08 * step);
+      if (Math.abs(state.effectiveFlow) < 0.005 && targetFlow === 0) state.effectiveFlow = 0;
 
-      const demandMap = { 1: 25, 2: 45, 3: 75 };
-      const pumpDemand = demandMap[state.flowSetting];
-
-      if (state.solarOutput >= pumpDemand) {
-        state.pumpActive = true;
-        if (state.batteryEnabled) {
-          state.batteryLevel = Math.min(100, state.batteryLevel + (state.solarOutput - pumpDemand) * 0.0022 * dt * 60);
-        }
-      } else {
-        const deficit = pumpDemand - state.solarOutput;
-        if (state.batteryEnabled && state.batteryLevel > 0.5) {
-          state.pumpActive = true;
-          state.batteryLevel = Math.max(0, state.batteryLevel - deficit * 0.0025 * dt * 60);
-        } else if (state.solarOutput >= 20) {
-          state.pumpActive = true;
-        } else {
-          state.pumpActive = false;
-        }
-      }
-
-      let targetFlow = 0;
-      if (state.pumpActive) {
-        const base = state.flowSetting === 1 ? 0.45 : state.flowSetting === 2 ? 0.85 : 1.25;
-        const powerRatio = (state.batteryEnabled && state.batteryLevel > 0.5)
-          ? 1
-          : Math.min(1, state.solarOutput / pumpDemand);
-        targetFlow = base * powerRatio;
-      }
-      state.effectiveFlow += (targetFlow - state.effectiveFlow) * 0.08;
+      // Monotonic animation phases (never spin or flow backwards when slowing down!)
+      state.flowPhase += dt * state.effectiveFlow;
+      if (state.solarOutput > 0) state.solarPhase += dt * (state.solarOutput / 100);
 
       const rainRunoff = state.weather === 'rainy' ? 0.025 : 0.004;
-      state.dirt = Math.min(100, state.dirt + rainRunoff);
-      state.ammonia = Math.min(100, state.ammonia + 0.012);
+      state.dirt = Math.min(100, state.dirt + rainRunoff * step);
+      state.ammonia = Math.min(100, state.ammonia + 0.012 * step);
 
       if (state.effectiveFlow > 0.05) {
         const contactEfficiency = state.flowSetting === 3 ? 0.62 : 1.0;
@@ -761,11 +860,11 @@
         const bacteriaClean = state.layers.bacteria ? 0.040 : 0.004;
         const plantClean = state.layers.plants ? 0.028 : 0.003;
 
-        state.dirt = Math.max(4, state.dirt - gravelClean * state.effectiveFlow * contactEfficiency);
-        state.ammonia = Math.max(3, state.ammonia - (bacteriaClean + plantClean * 0.6) * state.effectiveFlow * contactEfficiency);
-        state.oxygen = Math.min(98, state.oxygen + 0.035 * state.effectiveFlow);
+        state.dirt = Math.max(4, state.dirt - gravelClean * state.effectiveFlow * contactEfficiency * step);
+        state.ammonia = Math.max(3, state.ammonia - (bacteriaClean + plantClean * 0.6) * state.effectiveFlow * contactEfficiency * step);
+        state.oxygen = Math.min(98, state.oxygen + 0.035 * state.effectiveFlow * step);
       } else {
-        state.oxygen = Math.max(25, state.oxygen - 0.015);
+        state.oxygen = Math.max(25, state.oxygen - 0.015 * step);
       }
 
       const intakeX = 0.56;
@@ -773,7 +872,7 @@
       let anyStressed = false;
 
       for (const ax of axolotls) {
-        ax.phase += 0.06 * (state.flowSetting === 3 && state.effectiveFlow > 0.8 ? 2.1 : 1);
+        ax.phase += 0.06 * step * (state.flowSetting === 3 && state.effectiveFlow > 0.8 ? 2.1 : 1);
         const dx = intakeX - ax.x;
         const dy = intakeY - ax.y;
         const dist = Math.hypot(dx, dy);
@@ -781,37 +880,40 @@
         ax.stressed = false;
 
         if (state.effectiveFlow > 0.1) {
-          const pullRadius = state.guard === 'none' ? 0.24 : state.guard === 'grating' ? (ax.baby ? 0.16 : 0.09) : 0.06;
+          const pullRadius = state.guard === 'none' ? 0.28 : state.guard === 'grating' ? (ax.baby ? 0.18 : 0.09) : 0.06;
           if (dist < pullRadius && dist > 0.01) {
-            const pullStrength = (state.guard === 'none' ? 0.0018 : state.guard === 'grating' && ax.baby ? 0.0011 : 0.00025) * state.effectiveFlow;
-            ax.vx += (dx / dist) * pullStrength * 0.18;
-            ax.vy += (dy / dist) * pullStrength * 0.18;
+            const pullStrength = (state.guard === 'none' ? 0.0020 : state.guard === 'grating' && ax.baby ? 0.0012 : 0.0002) * state.effectiveFlow;
+            ax.vx += (dx / dist) * pullStrength * 0.18 * step;
+            ax.vy += (dy / dist) * pullStrength * 0.18 * step;
 
             if (state.guard === 'none' || (state.guard === 'grating' && ax.baby)) {
               ax.stressed = true;
               anyStressed = true;
-              if (dist < 0.055) {
+              if (dist < 0.065) {
                 ax.vx = -0.0032;
                 ax.vy = -0.0016;
-                state.suctionWarningTimer = 70;
+                state.suctionWarningTimer = 75;
+                state.suctionWarningType = state.guard === 'none' ? 'open' : 'baby';
               }
             }
           }
         }
 
         if (state.flowSetting === 3 && state.effectiveFlow > 0.8) {
-          ax.vx -= 0.00018;
+          ax.vx -= 0.00018 * step;
           ax.stressed = true;
           anyStressed = true;
         }
 
-        ax.vx += (Math.random() - 0.5) * 0.00009;
-        ax.vy += (Math.random() - 0.5) * 0.00006;
+        ax.vx += (Math.random() - 0.5) * 0.00009 * step;
+        ax.vy += (Math.random() - 0.5) * 0.00006 * step;
 
-        ax.vx *= 0.985;
-        ax.vy *= 0.98;
-        ax.x += ax.vx;
-        ax.y += ax.vy;
+        const dampX = Math.pow(0.985, step);
+        const dampY = Math.pow(0.98, step);
+        ax.vx *= dampX;
+        ax.vy *= dampY;
+        ax.x += ax.vx * step;
+        ax.y += ax.vy * step;
 
         if (ax.x < 0.07) { ax.x = 0.07; ax.vx = Math.abs(ax.vx) + 0.0004; }
         if (ax.x > 0.51) { ax.x = 0.51; ax.vx = -Math.abs(ax.vx) - 0.0004; }
@@ -823,17 +925,25 @@
         }
       }
 
-      if (state.suctionWarningTimer > 0) state.suctionWarningTimer--;
+      if (state.suctionWarningTimer > 0) {
+        state.suctionWarningTimer = Math.max(0, state.suctionWarningTimer - step);
+      }
 
       const targetDirtCount = Math.round(state.dirt * 0.35);
       const targetAmmoCount = Math.round(state.ammonia * 0.30);
+      let oxyCount = 0;
 
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         if (p.zone === 'lake') {
           if (p.type === 'oxygen') {
-            p.y -= 0.0009;
-            p.x += Math.sin(state.time * 3 + i) * 0.0003;
+            oxyCount++;
+            if (oxyCount > 26) {
+              particles.splice(i, 1);
+              continue;
+            }
+            p.y -= 0.0009 * step;
+            p.x += Math.sin(state.time * 3 + i) * 0.0003 * step;
             if (p.y < 0.48) {
               if (state.effectiveFlow > 0.1) {
                 p.x = 0.53 + (Math.random() - 0.5) * 0.12;
@@ -848,8 +958,8 @@
               const dx = intakeX - p.x;
               const dy = intakeY - p.y;
               const d = Math.hypot(dx, dy) + 0.01;
-              p.x += (dx / d) * 0.0009 * state.effectiveFlow + p.vx;
-              p.y += (dy / d) * 0.0007 * state.effectiveFlow + p.vy;
+              p.x += ((dx / d) * 0.0009 * state.effectiveFlow + p.vx) * step;
+              p.y += ((dy / d) * 0.0007 * state.effectiveFlow + p.vy) * step;
               if (d < 0.045) {
                 p.zone = 'bog';
                 p.x = 0.67 + Math.random() * 0.27;
@@ -857,8 +967,8 @@
                 p.cleaned = false;
               }
             } else {
-              p.x += p.vx;
-              p.y += p.vy;
+              p.x += p.vx * step;
+              p.y += p.vy * step;
             }
             if (p.x < 0.03) p.x = 0.52;
             if (p.x > 0.56) p.x = 0.06;
@@ -866,49 +976,54 @@
             if (p.y > 0.91) p.y = 0.91;
           }
         } else if (p.zone === 'bog') {
-          const riseSpeed = 0.0014 * Math.max(0.15, state.effectiveFlow);
-          p.y -= riseSpeed;
-          p.x += Math.sin(state.time * 4 + i) * 0.00025;
+          // Only rise when water is actually being pumped through the bog filter!
+          if (state.effectiveFlow > 0.02) {
+            const riseSpeed = 0.0014 * state.effectiveFlow * step;
+            p.y -= riseSpeed;
+            p.x += Math.sin(state.time * 4 + i) * 0.00025 * step;
 
-          if (p.type === 'dirt' && state.layers.gravel && p.y < 0.78 && Math.random() < 0.06) {
-            p.cleaned = true;
-          }
-          if (p.type === 'ammonia' && state.layers.bacteria && p.y < 0.66 && Math.random() < 0.06) {
-            p.cleaned = true;
-          }
-          if (state.layers.plants && p.y < 0.53 && Math.random() < 0.08) {
-            p.cleaned = true;
-          }
+            if (p.type === 'dirt' && state.layers.gravel && p.y < 0.78 && Math.random() < 0.06 * step) {
+              p.cleaned = true;
+            }
+            if (p.type === 'ammonia' && state.layers.bacteria && p.y < 0.66 && Math.random() < 0.06 * step) {
+              p.cleaned = true;
+            }
+            if (state.layers.plants && p.y < 0.53 && Math.random() < 0.08 * step) {
+              p.cleaned = true;
+            }
 
-          if (p.y < 0.43) {
-            p.zone = 'lake';
-            p.x = 0.50 + Math.random() * 0.08;
-            p.y = 0.50 + Math.random() * 0.08;
-            if (p.cleaned) {
-              p.type = 'oxygen';
+            if (p.y < 0.43) {
+              p.zone = 'lake';
+              p.x = 0.50 + Math.random() * 0.08;
+              p.y = 0.50 + Math.random() * 0.08;
+              if (p.cleaned) {
+                p.type = 'oxygen';
+              }
             }
           }
         }
       }
 
       const curDirt = particles.filter(p => p.zone === 'lake' && p.type === 'dirt').length;
-      if (curDirt < targetDirtCount && particles.length < 110) particles.push(createLakeParticle('dirt'));
+      if (curDirt < targetDirtCount && particles.length < 120) particles.push(createLakeParticle('dirt'));
       const curAmmo = particles.filter(p => p.zone === 'lake' && p.type === 'ammonia').length;
-      if (curAmmo < targetAmmoCount && particles.length < 110) particles.push(createLakeParticle('ammonia'));
+      if (curAmmo < targetAmmoCount && particles.length < 120) particles.push(createLakeParticle('ammonia'));
 
       for (const c of clouds) {
-        c.x += c.speed * (state.weather === 'rainy' ? 2.4 : 1);
+        c.x += c.speed * (state.weather === 'rainy' ? 2.4 : 1) * step;
         if (c.x > 1.15) c.x = -0.15;
       }
       if (state.weather === 'rainy') {
         for (const r of raindrops) {
-          r.y += r.speed;
-          r.x -= 0.002;
+          r.y += r.speed * step;
+          r.x -= 0.002 * step;
           if (r.y > 0.55) { r.y = -0.05; r.x = Math.random() * 1.1; }
         }
       }
 
-      if (Math.floor(state.time * 60) % 8 === 0) {
+      uiTickAccumulator += dt;
+      if (uiTickAccumulator >= 0.13) {
+        uiTickAccumulator = 0;
         updateMetricsUI(anyStressed);
       }
     }
@@ -925,7 +1040,7 @@
 
       el.powerReadout.textContent = `Solar: ${state.solarOutput}%`;
       el.batteryReadout.textContent = state.batteryEnabled ? `Battery: ${Math.round(state.batteryLevel)}%` : 'Battery: OFF';
-      el.pumpReadout.textContent = state.pumpActive ? 'Pump: ON' : 'Pump: STOPPED';
+      el.pumpReadout.textContent = !state.pumpActive ? 'Pump: STOPPED' : state.weakSolar ? 'Pump: LOW' : 'Pump: ON';
 
       el.batteryBar.style.width = `${state.batteryEnabled ? Math.round(state.batteryLevel) : 0}%`;
       el.batteryBar.style.background = state.batteryLevel > 30 ? 'var(--success)' : 'var(--warning)';
@@ -936,7 +1051,10 @@
       } else if (state.guard === 'none') {
         el.statusDot.style.background = 'var(--warning)';
         el.statusText.textContent = 'Running — Warning: Unprotected Intake Pipe!';
-      } else if (state.weather === 'night' || state.weather === 'rainy') {
+      } else if (state.weakSolar) {
+        el.statusDot.style.background = 'var(--warning)';
+        el.statusText.textContent = 'Running Slowly — Low Sunlight & Battery OFF';
+      } else if (state.onBattery) {
         el.statusDot.style.background = 'var(--primary)';
         el.statusText.textContent = 'System Running on Battery Backup';
       } else {
@@ -1180,7 +1298,7 @@
       ctx.strokeStyle = state.effectiveFlow > 0.05 ? '#38bdf8' : '#475569';
       ctx.lineWidth = 5;
       ctx.setLineDash(state.effectiveFlow > 0.05 ? [8, 8] : []);
-      ctx.lineDashOffset = -state.time * 60 * state.effectiveFlow;
+      ctx.lineDashOffset = -state.flowPhase * 60;
       ctx.beginPath();
       ctx.moveTo(intakeX, intakeY);
       ctx.lineTo(bx + bw * 0.85, intakeY);
@@ -1199,7 +1317,7 @@
 
       ctx.save();
       ctx.translate(pumpX, pumpY);
-      ctx.rotate(state.time * 8 * state.effectiveFlow);
+      ctx.rotate(state.flowPhase * 8);
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       for (let k = 0; k < 3; k++) {
@@ -1224,7 +1342,7 @@
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 10]);
-        ctx.lineDashOffset = -state.time * 85 * state.effectiveFlow;
+        ctx.lineDashOffset = -state.flowPhase * 85;
         ctx.beginPath();
         ctx.moveTo(bx, by + 10);
         ctx.quadraticCurveTo(W * 0.59, by + 10, W * 0.55, H * 0.49);
@@ -1273,6 +1391,8 @@
 
       if (state.suctionWarningTimer > 0 && state.guard === 'none') {
         drawCallout(intakeX - 75, intakeY - 42, 'Whoa! Strong suction!', '#ef4444');
+      } else if (state.suctionWarningTimer > 0 && state.guard === 'grating' && state.suctionWarningType === 'baby') {
+        drawCallout(intakeX - 78, intakeY - 42, 'Careful! Baby axolotl!', '#d97706');
       }
 
       if (state.showArrows && state.effectiveFlow > 0.05) {
@@ -1306,7 +1426,8 @@
     function drawLakePlant(x, y, h, color) {
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
-      const sway = Math.sin(state.time * 2 + x * 0.05) * (state.flowSetting === 3 ? 10 : 4);
+      const strongCurrent = state.flowSetting === 3 && state.effectiveFlow > 0.6;
+      const sway = Math.sin(state.time * 2 + x * 0.05) * (strongCurrent ? 10 : 4);
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.quadraticCurveTo(x + sway, y - h * 0.5, x + sway * 1.4, y - h);
@@ -1344,7 +1465,7 @@
           ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
           ctx.lineWidth = 1.6;
           for (let a = -1; a <= 1; a++) {
-            const offset = (state.time * 30) % 24;
+            const offset = (state.flowPhase * 34) % 24;
             ctx.beginPath();
             ctx.moveTo(x - 36 + offset, y + a * 12);
             ctx.lineTo(x - 22 + offset, y + a * 5);
@@ -1386,7 +1507,7 @@
         ctx.strokeStyle = 'rgba(253, 224, 71, 0.55)';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 6]);
-        ctx.lineDashOffset = -state.time * 40;
+        ctx.lineDashOffset = -state.solarPhase * 40;
         ctx.beginPath();
         ctx.moveTo(W * 0.22, H * 0.15);
         ctx.lineTo(sx - 20, sy - 10);
@@ -1417,13 +1538,23 @@
       drawSmallLabel(sx, sy - 30, 'SOLAR PANEL');
       ctx.textAlign = 'left';
 
-      ctx.strokeStyle = state.pumpActive ? '#facc15' : '#64748b';
+      // Wire 1: Solar Panel -> Battery/Controller (only energized when sunlight > 0)
+      ctx.strokeStyle = state.solarOutput > 0 ? '#facc15' : '#64748b';
       ctx.lineWidth = 2.5;
-      ctx.setLineDash(state.pumpActive ? [5, 5] : []);
-      ctx.lineDashOffset = -state.time * 45;
+      ctx.setLineDash(state.solarOutput > 0 ? [5, 5] : []);
+      ctx.lineDashOffset = -state.solarPhase * 45;
       ctx.beginPath();
       ctx.moveTo(sx, sy + 16);
       ctx.lineTo(batX - 24, batY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Wire 2: Controller/Battery -> Pump (yellow on solar, green on battery backup, gray when stopped)
+      ctx.strokeStyle = !state.pumpActive ? '#64748b' : state.onBattery ? '#22c55e' : '#facc15';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash(state.pumpActive ? [5, 5] : []);
+      ctx.lineDashOffset = -state.flowPhase * 52;
+      ctx.beginPath();
       ctx.moveTo(batX - 10, batY + 16);
       ctx.lineTo(batX - 10, H * 0.42);
       ctx.lineTo(pumpX, H * 0.42);
