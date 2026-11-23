@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bioglow Lake Lab — Solar Bog Filter Simulator</title>
+  <meta name="description" content="Interactive FIRST LEGO League Bioglow simulator helping 6th graders explore solar-powered pumps, battery backup, intake safety screens, and multi-stage bog filters for axolotl lakes." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --background: #f8fafc;
+      --content: #f1f5f9;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --foreground: #0f172a;
+      --muted-foreground: #475569;
+      --primary: #0284c7;
+      --primary-foreground: #ffffff;
+      --link: #0284c7;
+      --success: #16a34a;
+      --warning: #d97706;
+      --error: #dc2626;
+      --chart-1: #0ea5e9;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0b1120;
+        --content: #111827;
+        --card: #1e293b;
+        --border: #334155;
+        --foreground: #f8fafc;
+        --muted-foreground: #94a3b8;
+        --primary: #38bdf8;
+        --primary-foreground: #0f172a;
+        --link: #38bdf8;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --error: #ef4444;
+        --chart-1: #38bdf8;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+    .pill-btn {
+      transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease;
+    }
+    .pill-btn:active { transform: scale(0.97); }
+    input[type="range"] { cursor: pointer; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased m-0 p-4 md:p-6 min-h-screen">
+  <div class="max-w-6xl mx-auto space-y-5">
+
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-4 border-b border-[var(--border)]">
+      <div>
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">
+          <span>FIRST LEGO League • Bioglow Project</span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight mt-0.5">
+          Axolotl Lake &amp; Solar Bog Filter Lab
+        </h1>
+        <p class="text-sm text-[var(--muted-foreground)] mt-1">
+          Test weather, battery backup, intake guards, and multi-stage natural filtration to see how your design keeps axolotls thriving.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btn-microscope" class="pill-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)] flex items-center gap-1.5">
+          <span aria-hidden="true">🔬</span>
+          <span>Microscope View: <strong id="micro-label">OFF</strong></span>
+        </button>
+        <button id="btn-arrows" class="pill-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center gap-1.5">
+          <span aria-hidden="true">💧</span>
+          <span>Flow Arrows: <strong id="arrows-label">ON</strong></span>
+        </button>
+        <button id="btn-pollute" class="pill-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] bg-[var(--card)] hover:border-[var(--warning)] flex items-center gap-1.5">
+          <span aria-hidden="true">🌧️</span>
+          <span>Add Muddy Runoff</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Grid: Canvas + Controls -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+      <!-- Left: Live Simulation Canvas (8 cols) -->
+      <div class="lg:col-span-8 flex flex-col gap-4">
+        <div class="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm">
+          <!-- Canvas Top Status Bar -->
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)] text-xs">
+            <div class="flex items-center gap-2 font-semibold">
+              <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-[var(--success)]"></span>
+              <span id="system-status-text">System Running — Solar + Bog Filter Active</span>
+            </div>
+            <div class="flex items-center gap-3 text-[var(--muted-foreground)] font-mono tabular-nums">
+              <span id="power-readout">Solar: 100%</span>
+              <span>•</span>
+              <span id="battery-readout">Battery: 85%</span>
+              <span>•</span>
+              <span id="pump-readout">Pump: ON</span>
+            </div>
+          </div>
+
+          <!-- Interactive Canvas -->
+          <div class="relative w-full" style="aspect-ratio: 16 / 9; min-height: 320px;">
+            <canvas id="simCanvas"></canvas>
+            <!-- Floating Legend for Microscope Mode -->
+            <div id="micro-legend" class="hidden absolute bottom-3 left-3 px-3 py-2 rounded-lg bg-[var(--card)]/90 border border-[var(--border)] text-xs backdrop-blur-sm space-y-1">
+              <div class="font-semibold text-[var(--foreground)]">Microscope Key</div>
+              <div class="flex flex-wrap gap-x-3 gap-y-1 text-[var(--muted-foreground)]">
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#92400e"></span> Dirt / Debris</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#f59e0b"></span> Ammonia (Toxic)</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#10b981"></span> Good Bacteria</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#38bdf8"></span> Oxygen (O₂)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Explanation Banner -->
+          <div id="live-insight" class="px-4 py-3 border-t border-[var(--border)] text-xs md:text-sm bg-[var(--content)] flex items-start gap-2.5">
+            <span id="insight-icon" class="text-base leading-none mt-0.5">💡</span>
+            <p id="insight-text" class="m-0 leading-relaxed text-[var(--foreground)]">
+              Sunlight powers the pump and charges the battery backup. Dirty lake water passes through the fine screen, rises through gravel, bacteria, and plant roots, and tumbles back as a clean, oxygen-rich stream!
+            </p>
+          </div>
+        </div>
+
+        <!-- Ecosystem Health Meters -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3.5 shadow-sm">
+            <div class="flex items-center justify-between text-xs text-[var(--muted-foreground)]">
+              <span>Water Clarity</span>
+              <span id="clarity-val" class="font-mono font-bold text-[var(--foreground)]">78%</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-[var(--border)] mt-2 overflow-hidden">
+              <div id="clarity-bar" class="h-full rounded-full transition-all duration-300" style="width:78%; background: var(--chart-1, #0ea5e9);"></div>
+            </div>
+            <div id="clarity-note" class="text-xs text-[var(--muted-foreground)] mt-1.5">Clear &amp; sparkling</div>
+          </div>
+
+          <div class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3.5 shadow-sm">
+            <div class="flex items-center justify-between text-xs text-[var(--muted-foreground)]">
+              <span>Ammonia (Toxins)</span>
+              <span id="ammonia-val" class="font-mono font-bold text-[var(--foreground)]">18%</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-[var(--border)] mt-2 overflow-hidden">
+              <div id="ammonia-bar" class="h-full rounded-full transition-all duration-300" style="width:18%; background: var(--warning);"></div>
+            </div>
+            <div id="ammonia-note" class="text-xs text-[var(--muted-foreground)] mt-1.5">Safe for axolotls</div>
+          </div>
+
+          <div class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3.5 shadow-sm">
+            <div class="flex items-center justify-between text-xs text-[var(--muted-foreground)]">
+              <span>Dissolved Oxygen</span>
+              <span id="oxygen-val" class="font-mono font-bold text-[var(--foreground)]">84%</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-[var(--border)] mt-2 overflow-hidden">
+              <div id="oxygen-bar" class="h-full rounded-full transition-all duration-300" style="width:84%; background: var(--success);"></div>
+            </div>
+            <div id="oxygen-note" class="text-xs text-[var(--muted-foreground)] mt-1.5">Stream adds O₂</div>
+          </div>
+
+          <div class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3.5 shadow-sm">
+            <div class="flex items-center justify-between text-xs text-[var(--muted-foreground)]">
+              <span>Axolotl Health</span>
+              <span id="axolotl-val" class="font-mono font-bold text-[var(--foreground)]">Happy</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-[var(--border)] mt-2 overflow-hidden">
+              <div id="axolotl-bar" class="h-full rounded-full transition-all duration-300" style="width:90%; background: #ec4899;"></div>
+            </div>
+            <div id="axolotl-note" class="text-xs text-[var(--muted-foreground)] mt-1.5">Safe &amp; thriving</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Engineering Controls (4 cols) -->
+      <div class="lg:col-span-4 space-y-4">
+        <div class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-5 shadow-sm">
+          <div class="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+            <h2 class="text-sm font-bold uppercase tracking-wider">Engineering Controls</h2>
+            <button id="btn-reset" class="text-xs text-[var(--link)] hover:underline">Reset Lab</button>
+          </div>
+
+          <!-- 1. Weather Control -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold">1. Weather (Solar Input)</label>
+              <span id="weather-badge" class="text-xs font-mono text-[var(--muted-foreground)]">Sunny • 100%</span>
+            </div>
+            <div class="grid grid-cols-4 gap-1.5" id="weather-group">
+              <button data-weather="sunny" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]">
+                <span>☀️</span><span>Sunny</span>
+              </button>
+              <button data-weather="cloudy" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+                <span>⛅</span><span>Cloudy</span>
+              </button>
+              <button data-weather="rainy" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+                <span>🌧️</span><span>Rainy</span>
+              </button>
+              <button data-weather="night" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+                <span>🌙</span><span>Night</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Battery Backup -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold">2. Battery Backup</label>
+              <button id="btn-battery" class="pill-btn px-3 py-1 rounded-full text-xs font-semibold border border-[var(--success)] bg-[var(--success)] text-white">
+                ON
+              </button>
+            </div>
+            <div class="w-full h-2.5 rounded-full bg-[var(--border)] overflow-hidden">
+              <div id="battery-bar" class="h-full rounded-full transition-all duration-200" style="width: 85%; background: var(--success);"></div>
+            </div>
+            <p id="battery-desc" class="text-xs text-[var(--muted-foreground)] m-0">
+              Stores extra daytime solar energy so the pump keeps running on cloudy days and at night.
+            </p>
+          </div>
+
+          <!-- 3. Intake Safety (Axolotl Protection) -->
+          <div class="space-y-2">
+            <label class="text-xs font-semibold block">3. Intake Pipe Guard (Axolotl Safety)</label>
+            <div class="grid grid-cols-1 gap-1.5" id="guard-group">
+              <button data-guard="screen" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]">
+                <div class="font-semibold">Fine Screen + Small Tube (Recommended)</div>
+                <div class="opacity-85">Keeps adult &amp; baby axolotls safe; blocks big leaves.</div>
+              </button>
+              <button data-guard="grating" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+                <div class="font-semibold">Metal Grating Only</div>
+                <div class="opacity-75">Stops adult axolotls, but tiny babies or twigs can slip in.</div>
+              </button>
+              <button data-guard="none" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+                <div class="font-semibold">Open Pipe (No Guard!)</div>
+                <div class="opacity-75">Danger: suction pulls curious axolotls toward the pipe!</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- 4. Pump Flow Rate -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <label for="flow-slider" class="text-xs font-semibold">4. Stream &amp; Pump Flow Speed</label>
+              <span id="flow-label" class="text-xs font-mono font-semibold text-[var(--success)]">Medium (Ideal)</span>
+            </div>
+            <input id="flow-slider" type="range" min="1" max="3" step="1" value="2" class="w-full accent-[var(--primary)]" />
+            <div class="flex justify-between text-xs text-[var(--muted-foreground)]">
+              <span>Gentle (Slow)</span>
+              <span>Medium (Ideal)</span>
+              <span>Turbo (Too Fast)</span>
+            </div>
+          </div>
+
+          <!-- 5. Multi-Stage Filter Layers -->
+          <div class="space-y-2 pt-1 border-t border-[var(--border)]">
+            <label class="text-xs font-semibold block">5. Multiple Filtering Methods</label>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[var(--content)] border border-[var(--border)] cursor-pointer">
+                <span><strong>Layer 1:</strong> Coarse Gravel (Traps Dirt)</span>
+                <input id="chk-gravel" type="checkbox" checked class="accent-[var(--primary)] w-4 h-4" />
+              </label>
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[var(--content)] border border-[var(--border)] cursor-pointer">
+                <span><strong>Layer 2:</strong> Biofilm Bacteria (Eats Ammonia)</span>
+                <input id="chk-bacteria" type="checkbox" checked class="accent-[var(--primary)] w-4 h-4" />
+              </label>
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[var(--content)] border border-[var(--border)] cursor-pointer">
+                <span><strong>Layer 3:</strong> Wetland Plants (Absorbs Nutrients)</span>
+                <input id="chk-plants" type="checkbox" checked class="accent-[var(--primary)] w-4 h-4" />
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Section: Students' Whiteboard Questions Explorer -->
+    <section class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 md:p-5 space-y-4 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h2 class="text-base font-bold">Your Team's Whiteboard Questions — Click to Test!</h2>
+          <p class="text-xs text-[var(--muted-foreground)] m-0">
+            Click any question from your brainstorm board to run an experiment in the simulator above and see the science behind it.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <!-- Q1 -->
+        <button data-preset="weather" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold text-[var(--primary)]">☀️ Weather &amp; Solar</div>
+            <div class="text-sm font-semibold mt-1">What happens on cloudy days or at night?</div>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
+              Solar panels make less power in clouds and zero at night. A <strong>battery backup</strong> stores daytime energy so the lake stays clean 24/7.
+            </p>
+          </div>
+          <span class="text-xs font-semibold text-[var(--link)]">▶ Run Night + Battery Test</span>
+        </button>
+
+        <!-- Q2 -->
+        <button data-preset="stream" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold text-[var(--primary)]">🔄 Stream In &amp; Out</div>
+            <div class="text-sm font-semibold mt-1">Is there a stream that goes both in and out?</div>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
+              Yes! It's a <strong>closed loop</strong>: the pump pulls dirty water in through a hidden intake, and clean water tumbles back out as a gentle oxygenated stream.
+            </p>
+          </div>
+          <span class="text-xs font-semibold text-[var(--link)]">▶ Highlight Flow Loop</span>
+        </button>
+
+        <!-- Q3 -->
+        <button data-preset="suction" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold text-[var(--primary)]">🛡️ Axolotl Safety</div>
+            <div class="text-sm font-semibold mt-1">Will axolotls get sucked in?</div>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
+              Without a guard, yes! Adding a <strong>fine mesh screen, grating, and wide low-suction intake</strong> spreads out the pull so axolotls swim right past safely.
+            </p>
+          </div>
+          <span class="text-xs font-semibold text-[var(--link)]">▶ Test Open Pipe Risk</span>
+        </button>
+
+        <!-- Q4 -->
+        <button data-preset="multistage" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold text-[var(--primary)]">🌿 Multiple Filters</div>
+            <div class="text-sm font-semibold mt-1">How do 3 filtering methods work together?</div>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
+              <strong>1. Gravel</strong> traps mud (mechanical). <strong>2. Good bacteria</strong> turn toxic ammonia into plant food (biological). <strong>3. Plant roots</strong> drink it up!
+            </p>
+          </div>
+          <span class="text-xs font-semibold text-[var(--link)]">▶ Open Microscope View</span>
+        </button>
+
+        <!-- Q5 -->
+        <button data-preset="organisms" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold text-[var(--primary)]">🦎 Lake Organisms</div>
+            <div class="text-sm font-semibold mt-1">Will the bog filter affect organisms?</div>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
+              It <strong>helps</strong> axolotls &amp; fish by removing toxins and adding oxygen — as long as flow stays gentle (axolotls hate strong currents!) and plants are native.
+            </p>
+          </div>
+          <span class="text-xs font-semibold text-[var(--link)]">▶ Test Too-Fast Current</span>
+        </button>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // --- Simulation State ---
+    const state = {
+      weather: 'sunny',        // 'sunny' | 'cloudy' | 'rainy' | 'night'
+      batteryEnabled: true,
+      batteryLevel: 85,        // 0..100
+      guard: 'screen',         // 'screen' | 'grating' | 'none'
+      flowSetting: 2,          // 1 = slow, 2 = medium, 3 = fast
+      layers: {
+        gravel: true,
+        bacteria: true,
+        plants: true,
+      },
+      microscope: false,
+      showArrows: true,
+      // Dynamic lake metrics (0..100)
+      dirt: 22,                // lower is cleaner
+      ammonia: 18,             // lower is safer
+      oxygen: 84,              // higher is better
+      pumpActive: true,
+      effectiveFlow: 0.7,      // 0..1.2
+      solarOutput: 100,        // 0..100
+      time: 0,
+      suctionWarningTimer: 0,
+    };
+
+    // Canvas setup
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    let W = 960, H = 540;
+
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = rect.width;
+      H = rect.height;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Entities
+    const axolotls = [
+      { x: 0.22, y: 0.72, vx: 0.0005, vy: 0.0001, dir: 1, size: 1.0, color: '#f9a8d4', gillColor: '#f43f5e', phase: 0, stressed: false },
+      { x: 0.42, y: 0.80, vx: -0.0004, vy: -0.0001, dir: -1, size: 0.85, color: '#fbcfe8', gillColor: '#ec4899', phase: 2.1, stressed: false },
+      { x: 0.15, y: 0.86, vx: 0.00035, vy: 0.00005, dir: 1, size: 0.62, color: '#fde68a', gillColor: '#f59e0b', phase: 4.0, stressed: false, baby: true },
+    ];
+
+    const particles = [];
+    const raindrops = Array.from({ length: 55 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      speed: 0.012 + Math.random() * 0.008,
+    }));
+    const clouds = [
+      { x: 0.15, y: 0.13, scale: 1.0, speed: 0.00015 },
+      { x: 0.52, y: 0.10, scale: 1.25, speed: 0.00011 },
+      { x: 0.82, y: 0.16, scale: 0.9, speed: 0.00018 },
+    ];
+    const stars = Array.from({ length: 35 }, () => ({
+      x: Math.random(),
+      y: Math.random() * 0.36,
+      r: 0.8 + Math.random() * 1.4,
+      twinkle: Math.random() * Math.PI * 2,
+    }));
+
+    function spawnInitialParticles() {
+      particles.length = 0;
+      for (let i = 0; i < 42; i++) {
+        particles.push(createLakeParticle());
+      }
+      for (let i = 0; i < 24; i++) {
+        particles.push(createBogParticle());
+      }
+    }
+
+    function createLakeParticle(forceType) {
+      const r = Math.random();
+      const type = forceType || (r < 0.38 ? 'dirt' : r < 0.72 ? 'ammonia' : 'oxygen');
+      return {
+        zone: 'lake',
+        type,
+        x: 0.04 + Math.random() * 0.52,
+        y: 0.52 + Math.random() * 0.40,
+        vx: (Math.random() - 0.5) * 0.0008,
+        vy: (Math.random() - 0.5) * 0.0005,
+        r: type === 'dirt' ? 3.2 : type === 'ammonia' ? 2.8 : 2.6,
+        alpha: 0.85,
+      };
+    }
+
+    function createBogParticle() {
+      return {
+        zone: 'bog',
+        type: Math.random() < 0.5 ? 'dirt' : 'ammonia',
+        x: 0.67 + Math.random() * 0.27,
+        y: 0.58 + Math.random() * 0.28,
+        vy: -0.0012,
+        r: 2.8,
+        cleaned: false,
+      };
+    }
+
+    spawnInitialParticles();
+
+    // --- UI References ---
+    const el = {
+      statusDot: document.getElementById('status-dot'),
+      statusText: document.getElementById('system-status-text'),
+      powerReadout: document.getElementById('power-readout'),
+      batteryReadout: document.getElementById('battery-readout'),
+      pumpReadout: document.getElementById('pump-readout'),
+      insightIcon: document.getElementById('insight-icon'),
+      insightText: document.getElementById('insight-text'),
+      clarityVal: document.getElementById('clarity-val'),
+      clarityBar: document.getElementById('clarity-bar'),
+      clarityNote: document.getElementById('clarity-note'),
+      ammoniaVal: document.getElementById('ammonia-val'),
+      ammoniaBar: document.getElementById('ammonia-bar'),
+      ammoniaNote: document.getElementById('ammonia-note'),
+      oxygenVal: document.getElementById('oxygen-val'),
+      oxygenBar: document.getElementById('oxygen-bar'),
+      oxygenNote: document.getElementById('oxygen-note'),
+      axolotlVal: document.getElementById('axolotl-val'),
+      axolotlBar: document.getElementById('axolotl-bar'),
+      axolotlNote: document.getElementById('axolotl-note'),
+      weatherBadge: document.getElementById('weather-badge'),
+      btnBattery: document.getElementById('btn-battery'),
+      batteryBar: document.getElementById('battery-bar'),
+      batteryDesc: document.getElementById('battery-desc'),
+      flowSlider: document.getElementById('flow-slider'),
+      flowLabel: document.getElementById('flow-label'),
+      chkGravel: document.getElementById('chk-gravel'),
+      chkBacteria: document.getElementById('chk-bacteria'),
+      chkPlants: document.getElementById('chk-plants'),
+      btnMicroscope: document.getElementById('btn-microscope'),
+      microLabel: document.getElementById('micro-label'),
+      microLegend: document.getElementById('micro-legend'),
+      btnArrows: document.getElementById('btn-arrows'),
+      arrowsLabel: document.getElementById('arrows-label'),
+      btnPollute: document.getElementById('btn-pollute'),
+      btnReset: document.getElementById('btn-reset'),
+    };
+
+    // --- Event Listeners ---
+    document.querySelectorAll('.weather-btn').forEach(btn => {
+      btn.addEventListener('click', () => setWeather(btn.dataset.weather));
+    });
+
+    document.querySelectorAll('.guard-btn').forEach(btn => {
+      btn.addEventListener('click', () => setGuard(btn.dataset.guard));
+    });
+
+    el.btnBattery.addEventListener('click', () => {
+      state.batteryEnabled = !state.batteryEnabled;
+      syncControlsUI();
+    });
+
+    el.flowSlider.addEventListener('input', (e) => {
+      state.flowSetting = Number(e.target.value);
+      syncControlsUI();
+    });
+
+    el.chkGravel.addEventListener('change', () => { state.layers.gravel = el.chkGravel.checked; updateInsight(); });
+    el.chkBacteria.addEventListener('change', () => { state.layers.bacteria = el.chkBacteria.checked; updateInsight(); });
+    el.chkPlants.addEventListener('change', () => { state.layers.plants = el.chkPlants.checked; updateInsight(); });
+
+    el.btnMicroscope.addEventListener('click', () => {
+      state.microscope = !state.microscope;
+      syncControlsUI();
+    });
+
+    el.btnArrows.addEventListener('click', () => {
+      state.showArrows = !state.showArrows;
+      syncControlsUI();
+    });
+
+    el.btnPollute.addEventListener('click', () => {
+      state.dirt = Math.min(100, state.dirt + 38);
+      state.ammonia = Math.min(100, state.ammonia + 32);
+      for (let i = 0; i < 16; i++) {
+        particles.push(createLakeParticle(i % 2 === 0 ? 'dirt' : 'ammonia'));
+      }
+      updateInsight('🌧️', 'Muddy runoff just entered the lake! Watch the pump pull dirty water into the bog filter so the gravel, bacteria, and plants can clean it back up.');
+    });
+
+    el.btnReset.addEventListener('click', () => {
+      state.weather = 'sunny';
+      state.batteryEnabled = true;
+      state.batteryLevel = 85;
+      state.guard = 'screen';
+      state.flowSetting = 2;
+      state.layers = { gravel: true, bacteria: true, plants: true };
+      state.microscope = false;
+      state.showArrows = true;
+      state.dirt = 22;
+      state.ammonia = 18;
+      state.oxygen = 84;
+      spawnInitialParticles();
+      syncControlsUI();
+    });
+
+    // Whiteboard Question Presets
+    document.querySelectorAll('.preset-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const p = card.dataset.preset;
+        if (p === 'weather') {
+          setWeather('night');
+          state.batteryEnabled = true;
+          state.batteryLevel = Math.max(state.batteryLevel, 65);
+          syncControlsUI();
+          updateInsight('🌙', 'Nighttime Test! Solar output dropped to 0%, but your Battery Backup kicked in automatically so the bog filter keeps protecting the axolotls. Try turning Battery OFF to see what happens!');
+        } else if (p === 'stream') {
+          setWeather('sunny');
+          state.flowSetting = 2;
+          state.showArrows = true;
+          syncControlsUI();
+          updateInsight('🔄', 'Follow the blue arrows! Dirty lake water enters the screened intake pipe on the bottom, rises up through the bog filter, and flows back out as a gentle stream that adds fresh oxygen.');
+        } else if (p === 'suction') {
+          setWeather('sunny');
+          setGuard('none');
+          state.flowSetting = 2;
+          syncControlsUI();
+          updateInsight('⚠️', 'Uh-oh! With an open pipe and no guard, the pump suction pulls curious axolotls toward the intake! Switch back to "Fine Screen + Small Tube" to keep them safe.');
+        } else if (p === 'multistage') {
+          setWeather('sunny');
+          setGuard('screen');
+          state.microscope = true;
+          state.layers = { gravel: true, bacteria: true, plants: true };
+          state.dirt = Math.max(state.dirt, 50);
+          state.ammonia = Math.max(state.ammonia, 48);
+          syncControlsUI();
+          updateInsight('🔬', 'Microscope Mode ON! Look inside the bog filter: brown dirt gets trapped in the gravel, glowing green bacteria convert toxic amber ammonia into nutrients, and plant roots absorb them!');
+        } else if (p === 'organisms') {
+          setWeather('sunny');
+          setGuard('screen');
+          state.flowSetting = 3;
+          syncControlsUI();
+          updateInsight('🦎', 'Notice how "Turbo" flow stresses the axolotls! Wild axolotls live in calm canals (like Lake Xochimilco). A gentle-to-medium stream gives them clean, oxygenated water without pushing them around.');
+        }
+      });
+    });
+
+    function setWeather(w) {
+      state.weather = w;
+      syncControlsUI();
+    }
+
+    function setGuard(g) {
+      state.guard = g;
+      syncControlsUI();
+    }
+
+    let customInsightTimer = 0;
+    function updateInsight(icon, text) {
+      if (icon && text) {
+        el.insightIcon.textContent = icon;
+        el.insightText.textContent = text;
+        customInsightTimer = 360;
+        return;
+      }
+      if (customInsightTimer > 0) return;
+
+      if (!state.pumpActive) {
+        el.insightIcon.textContent = '🔋';
+        el.insightText.textContent = 'The pump stopped because there is no sunlight and no battery backup! Without water moving through the bog filter, dirt and ammonia slowly build up in the lake.';
+      } else if (state.guard === 'none') {
+        el.insightIcon.textContent = '⚠️';
+        el.insightText.textContent = 'Warning: Open intake pipe! Suction can pull axolotls toward the tube. Add a fine screen or grating to protect lake wildlife.';
+      } else if (state.flowSetting === 3) {
+        el.insightIcon.textContent = '💨';
+        el.insightText.textContent = 'Flow is on Turbo! Strong currents stress axolotls and push water through the bog filter too fast for bacteria to finish cleaning ammonia.';
+      } else if (!state.layers.gravel || !state.layers.bacteria || !state.layers.plants) {
+        const missing = [];
+        if (!state.layers.gravel) missing.push('Gravel (dirt trap)');
+        if (!state.layers.bacteria) missing.push('Biofilm Bacteria (ammonia remover)');
+        if (!state.layers.plants) missing.push('Wetland Plants (nutrient absorber)');
+        el.insightIcon.textContent = '🧪';
+        el.insightText.textContent = `Experimenting with missing filter layers (${missing.join(', ')})! Notice how using multiple filtering methods together cleans the lake much better than any single layer alone.`;
+      } else if (state.weather === 'night' || state.weather === 'rainy') {
+        el.insightIcon.textContent = '🔋';
+        el.insightText.textContent = state.weather === 'rainy'
+          ? 'Rainy weather lowers solar power and adds muddy runoff, but your Battery Backup keeps the pump running and the bog filter catches the extra dirt!'
+          : 'No sunlight at night, so the Battery Backup is powering the pump! Tomorrow’s sun will recharge it.';
+      } else {
+        el.insightIcon.textContent = '✨';
+        el.insightText.textContent = 'Everything is in balance! Solar energy powers the pump & charges the battery, the fine screen protects axolotls, all 3 bog filter layers clean the water, and the return stream adds oxygen.';
+      }
+    }
+
+    function syncControlsUI() {
+      document.querySelectorAll('.weather-btn').forEach(btn => {
+        const active = btn.dataset.weather === state.weather;
+        btn.className = `weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 ${
+          active
+            ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]'
+            : 'border-[var(--border)] bg-[var(--content)] text-[var(--foreground)] hover:border-[var(--primary)]'
+        }`;
+      });
+
+      const weatherNames = {
+        sunny: 'Sunny • 100%',
+        cloudy: 'Cloudy • 45%',
+        rainy: 'Rainy • 20%',
+        night: 'Night • 0%',
+      };
+      el.weatherBadge.textContent = weatherNames[state.weather];
+
+      document.querySelectorAll('.guard-btn').forEach(btn => {
+        const active = btn.dataset.guard === state.guard;
+        btn.className = `guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs ${
+          active
+            ? (state.guard === 'none'
+                ? 'border-[var(--error)] bg-[var(--error)] text-white'
+                : 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]')
+            : 'border-[var(--border)] bg-[var(--content)] text-[var(--foreground)] hover:border-[var(--primary)]'
+        }`;
+      });
+
+      el.btnBattery.textContent = state.batteryEnabled ? 'ON' : 'OFF';
+      el.btnBattery.className = `pill-btn px-3 py-1 rounded-full text-xs font-semibold border ${
+        state.batteryEnabled
+          ? 'border-[var(--success)] bg-[var(--success)] text-white'
+          : 'border-[var(--border)] bg-[var(--content)] text-[var(--muted-foreground)]'
+      }`;
+
+      el.flowSlider.value = state.flowSetting;
+      const flowLabels = {
+        1: ['Gentle (Slow)', 'text-[var(--muted-foreground)]'],
+        2: ['Medium (Ideal)', 'text-[var(--success)]'],
+        3: ['Turbo (Too Fast)', 'text-[var(--warning)]'],
+      };
+      el.flowLabel.textContent = flowLabels[state.flowSetting][0];
+      el.flowLabel.className = `text-xs font-mono font-semibold ${flowLabels[state.flowSetting][1]}`;
+
+      el.chkGravel.checked = state.layers.gravel;
+      el.chkBacteria.checked = state.layers.bacteria;
+      el.chkPlants.checked = state.layers.plants;
+
+      el.microLabel.textContent = state.microscope ? 'ON' : 'OFF';
+      el.btnMicroscope.className = `pill-btn px-3.5 py-2 rounded-lg text-xs font-semibold border flex items-center gap-1.5 ${
+        state.microscope
+          ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]'
+          : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]'
+      }`;
+      el.microLegend.classList.toggle('hidden', !state.microscope);
+
+      el.arrowsLabel.textContent = state.showArrows ? 'ON' : 'OFF';
+      el.btnArrows.className = `pill-btn px-3.5 py-2 rounded-lg text-xs font-semibold border flex items-center gap-1.5 ${
+        state.showArrows
+          ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]'
+          : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]'
+      }`;
+
+      updateInsight();
+    }
+
+    // --- Simulation Physics & Ecology Step ---
+    function stepSimulation(dt) {
+      state.time += dt;
+      if (customInsightTimer > 0) customInsightTimer--;
+
+      const solarMap = { sunny: 100, cloudy: 45, rainy: 20, night: 0 };
+      state.solarOutput = solarMap[state.weather];
+
+      const demandMap = { 1: 25, 2: 45, 3: 75 };
+      const pumpDemand = demandMap[state.flowSetting];
+
+      if (state.solarOutput >= pumpDemand) {
+        state.pumpActive = true;
+        if (state.batteryEnabled) {
+          state.batteryLevel = Math.min(100, state.batteryLevel + (state.solarOutput - pumpDemand) * 0.0022 * dt * 60);
+        }
+      } else {
+        const deficit = pumpDemand - state.solarOutput;
+        if (state.batteryEnabled && state.batteryLevel > 0.5) {
+          state.pumpActive = true;
+          state.batteryLevel = Math.max(0, state.batteryLevel - deficit * 0.0025 * dt * 60);
+        } else if (state.solarOutput >= 20) {
+          state.pumpActive = true;
+        } else {
+          state.pumpActive = false;
+        }
+      }
+
+      let targetFlow = 0;
+      if (state.pumpActive) {
+        const base = state.flowSetting === 1 ? 0.45 : state.flowSetting === 2 ? 0.85 : 1.25;
+        const powerRatio = (state.batteryEnabled && state.batteryLevel > 0.5)
+          ? 1
+          : Math.min(1, state.solarOutput / pumpDemand);
+        targetFlow = base * powerRatio;
+      }
+      state.effectiveFlow += (targetFlow - state.effectiveFlow) * 0.08;
+
+      const rainRunoff = state.weather === 'rainy' ? 0.025 : 0.004;
+      state.dirt = Math.min(100, state.dirt + rainRunoff);
+      state.ammonia = Math.min(100, state.ammonia + 0.012);
+
+      if (state.effectiveFlow > 0.05) {
+        const contactEfficiency = state.flowSetting === 3 ? 0.62 : 1.0;
+        const gravelClean = state.layers.gravel ? 0.042 : 0.005;
+        const bacteriaClean = state.layers.bacteria ? 0.040 : 0.004;
+        const plantClean = state.layers.plants ? 0.028 : 0.003;
+
+        state.dirt = Math.max(4, state.dirt - gravelClean * state.effectiveFlow * contactEfficiency);
+        state.ammonia = Math.max(3, state.ammonia - (bacteriaClean + plantClean * 0.6) * state.effectiveFlow * contactEfficiency);
+        state.oxygen = Math.min(98, state.oxygen + 0.035 * state.effectiveFlow);
+      } else {
+        state.oxygen = Math.max(25, state.oxygen - 0.015);
+      }
+
+      const intakeX = 0.56;
+      const intakeY = 0.84;
+      let anyStressed = false;
+
+      for (const ax of axolotls) {
+        ax.phase += 0.06 * (state.flowSetting === 3 && state.effectiveFlow > 0.8 ? 2.1 : 1);
+        const dx = intakeX - ax.x;
+        const dy = intakeY - ax.y;
+        const dist = Math.hypot(dx, dy);
+
+        ax.stressed = false;
+
+        if (state.effectiveFlow > 0.1) {
+          const pullRadius = state.guard === 'none' ? 0.24 : state.guard === 'grating' ? (ax.baby ? 0.16 : 0.09) : 0.06;
+          if (dist < pullRadius && dist > 0.01) {
+            const pullStrength = (state.guard === 'none' ? 0.0018 : state.guard === 'grating' && ax.baby ? 0.0011 : 0.00025) * state.effectiveFlow;
+            ax.vx += (dx / dist) * pullStrength * 0.18;
+            ax.vy += (dy / dist) * pullStrength * 0.18;
+
+            if (state.guard === 'none' || (state.guard === 'grating' && ax.baby)) {
+              ax.stressed = true;
+              anyStressed = true;
+              if (dist < 0.055) {
+                ax.vx = -0.0032;
+                ax.vy = -0.0016;
+                state.suctionWarningTimer = 70;
+              }
+            }
+          }
+        }
+
+        if (state.flowSetting === 3 && state.effectiveFlow > 0.8) {
+          ax.vx -= 0.00018;
+          ax.stressed = true;
+          anyStressed = true;
+        }
+
+        ax.vx += (Math.random() - 0.5) * 0.00009;
+        ax.vy += (Math.random() - 0.5) * 0.00006;
+
+        ax.vx *= 0.985;
+        ax.vy *= 0.98;
+        ax.x += ax.vx;
+        ax.y += ax.vy;
+
+        if (ax.x < 0.07) { ax.x = 0.07; ax.vx = Math.abs(ax.vx) + 0.0004; }
+        if (ax.x > 0.51) { ax.x = 0.51; ax.vx = -Math.abs(ax.vx) - 0.0004; }
+        if (ax.y < 0.56) { ax.y = 0.56; ax.vy = Math.abs(ax.vy) + 0.0002; }
+        if (ax.y > 0.88) { ax.y = 0.88; ax.vy = -Math.abs(ax.vy) - 0.0002; }
+
+        if (Math.abs(ax.vx) > 0.0001) {
+          ax.dir = ax.vx >= 0 ? 1 : -1;
+        }
+      }
+
+      if (state.suctionWarningTimer > 0) state.suctionWarningTimer--;
+
+      const targetDirtCount = Math.round(state.dirt * 0.35);
+      const targetAmmoCount = Math.round(state.ammonia * 0.30);
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        if (p.zone === 'lake') {
+          if (p.type === 'oxygen') {
+            p.y -= 0.0009;
+            p.x += Math.sin(state.time * 3 + i) * 0.0003;
+            if (p.y < 0.48) {
+              if (state.effectiveFlow > 0.1) {
+                p.x = 0.53 + (Math.random() - 0.5) * 0.12;
+                p.y = 0.52 + Math.random() * 0.22;
+              } else {
+                p.y = 0.88;
+                p.x = 0.08 + Math.random() * 0.44;
+              }
+            }
+          } else {
+            if (state.effectiveFlow > 0.05) {
+              const dx = intakeX - p.x;
+              const dy = intakeY - p.y;
+              const d = Math.hypot(dx, dy) + 0.01;
+              p.x += (dx / d) * 0.0009 * state.effectiveFlow + p.vx;
+              p.y += (dy / d) * 0.0007 * state.effectiveFlow + p.vy;
+              if (d < 0.045) {
+                p.zone = 'bog';
+                p.x = 0.67 + Math.random() * 0.27;
+                p.y = 0.85;
+                p.cleaned = false;
+              }
+            } else {
+              p.x += p.vx;
+              p.y += p.vy;
+            }
+            if (p.x < 0.03) p.x = 0.52;
+            if (p.x > 0.56) p.x = 0.06;
+            if (p.y < 0.50) p.y = 0.50;
+            if (p.y > 0.91) p.y = 0.91;
+          }
+        } else if (p.zone === 'bog') {
+          const riseSpeed = 0.0014 * Math.max(0.15, state.effectiveFlow);
+          p.y -= riseSpeed;
+          p.x += Math.sin(state.time * 4 + i) * 0.00025;
+
+          if (p.type === 'dirt' && state.layers.gravel && p.y < 0.78 && Math.random() < 0.06) {
+            p.cleaned = true;
+          }
+          if (p.type === 'ammonia' && state.layers.bacteria && p.y < 0.66 && Math.random() < 0.06) {
+            p.cleaned = true;
+          }
+          if (state.layers.plants && p.y < 0.53 && Math.random() < 0.08) {
+            p.cleaned = true;
+          }
+
+          if (p.y < 0.43) {
+            p.zone = 'lake';
+            p.x = 0.50 + Math.random() * 0.08;
+            p.y = 0.50 + Math.random() * 0.08;
+            if (p.cleaned) {
+              p.type = 'oxygen';
+            }
+          }
+        }
+      }
+
+      const curDirt = particles.filter(p => p.zone === 'lake' && p.type === 'dirt').length;
+      if (curDirt < targetDirtCount && particles.length < 110) particles.push(createLakeParticle('dirt'));
+      const curAmmo = particles.filter(p => p.zone === 'lake' && p.type === 'ammonia').length;
+      if (curAmmo < targetAmmoCount && particles.length < 110) particles.push(createLakeParticle('ammonia'));
+
+      for (const c of clouds) {
+        c.x += c.speed * (state.weather === 'rainy' ? 2.4 : 1);
+        if (c.x > 1.15) c.x = -0.15;
+      }
+      if (state.weather === 'rainy') {
+        for (const r of raindrops) {
+          r.y += r.speed;
+          r.x -= 0.002;
+          if (r.y > 0.55) { r.y = -0.05; r.x = Math.random() * 1.1; }
+        }
+      }
+
+      if (Math.floor(state.time * 60) % 8 === 0) {
+        updateMetricsUI(anyStressed);
+      }
+    }
+
+    function updateMetricsUI(anyStressed) {
+      const clarity = Math.round(Math.max(0, Math.min(100, 100 - state.dirt * 0.85 - state.ammonia * 0.2)));
+      const ammonia = Math.round(state.ammonia);
+      const oxygen = Math.round(state.oxygen);
+
+      let health = clarity * 0.35 + (100 - ammonia) * 0.35 + oxygen * 0.30;
+      if (state.guard === 'none' && state.effectiveFlow > 0.1) health -= 30;
+      if (state.flowSetting === 3 && state.effectiveFlow > 0.8) health -= 22;
+      health = Math.round(Math.max(5, Math.min(100, health)));
+
+      el.powerReadout.textContent = `Solar: ${state.solarOutput}%`;
+      el.batteryReadout.textContent = state.batteryEnabled ? `Battery: ${Math.round(state.batteryLevel)}%` : 'Battery: OFF';
+      el.pumpReadout.textContent = state.pumpActive ? 'Pump: ON' : 'Pump: STOPPED';
+
+      el.batteryBar.style.width = `${state.batteryEnabled ? Math.round(state.batteryLevel) : 0}%`;
+      el.batteryBar.style.background = state.batteryLevel > 30 ? 'var(--success)' : 'var(--warning)';
+
+      if (!state.pumpActive) {
+        el.statusDot.style.background = 'var(--error)';
+        el.statusText.textContent = 'Pump Stopped — Needs Sunlight or Battery Backup';
+      } else if (state.guard === 'none') {
+        el.statusDot.style.background = 'var(--warning)';
+        el.statusText.textContent = 'Running — Warning: Unprotected Intake Pipe!';
+      } else if (state.weather === 'night' || state.weather === 'rainy') {
+        el.statusDot.style.background = 'var(--primary)';
+        el.statusText.textContent = 'System Running on Battery Backup';
+      } else {
+        el.statusDot.style.background = 'var(--success)';
+        el.statusText.textContent = 'System Running — Solar + Bog Filter Active';
+      }
+
+      el.clarityVal.textContent = `${clarity}%`;
+      el.clarityBar.style.width = `${clarity}%`;
+      el.clarityNote.textContent = clarity > 70 ? 'Clear & sparkling' : clarity > 45 ? 'Slightly cloudy' : 'Murky water';
+
+      el.ammoniaVal.textContent = `${ammonia}%`;
+      el.ammoniaBar.style.width = `${ammonia}%`;
+      el.ammoniaBar.style.background = ammonia < 25 ? 'var(--success)' : ammonia < 55 ? 'var(--warning)' : 'var(--error)';
+      el.ammoniaNote.textContent = ammonia < 25 ? 'Safe for axolotls' : ammonia < 55 ? 'Getting high' : 'Toxic buildup!';
+
+      el.oxygenVal.textContent = `${oxygen}%`;
+      el.oxygenBar.style.width = `${oxygen}%`;
+      el.oxygenNote.textContent = oxygen > 65 ? 'Stream adds O₂' : 'Low oxygen';
+
+      el.axolotlBar.style.width = `${health}%`;
+      if (health >= 75 && !anyStressed) {
+        el.axolotlVal.textContent = 'Happy';
+        el.axolotlNote.textContent = 'Safe & thriving';
+        el.axolotlBar.style.background = '#ec4899';
+      } else if (state.guard === 'none' && state.effectiveFlow > 0.1) {
+        el.axolotlVal.textContent = 'At Risk!';
+        el.axolotlNote.textContent = 'Needs intake screen!';
+        el.axolotlBar.style.background = 'var(--error)';
+      } else if (state.flowSetting === 3 && state.effectiveFlow > 0.8) {
+        el.axolotlVal.textContent = 'Stressed';
+        el.axolotlNote.textContent = 'Current too strong!';
+        el.axolotlBar.style.background = 'var(--warning)';
+      } else {
+        el.axolotlVal.textContent = 'Uneasy';
+        el.axolotlNote.textContent = 'Needs cleaner water';
+        el.axolotlBar.style.background = 'var(--warning)';
+      }
+
+      updateInsight();
+    }
+
+    // --- Canvas Rendering ---
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function lerpColor(c1, c2, t) {
+      const r = Math.round(lerp(c1[0], c2[0], t));
+      const g = Math.round(lerp(c1[1], c2[1], t));
+      const b = Math.round(lerp(c1[2], c2[2], t));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, H * 0.5);
+      if (state.weather === 'sunny') {
+        skyGrad.addColorStop(0, '#38bdf8');
+        skyGrad.addColorStop(1, '#bae6fd');
+      } else if (state.weather === 'cloudy') {
+        skyGrad.addColorStop(0, '#64748b');
+        skyGrad.addColorStop(1, '#cbd5e1');
+      } else if (state.weather === 'rainy') {
+        skyGrad.addColorStop(0, '#334155');
+        skyGrad.addColorStop(1, '#64748b');
+      } else {
+        skyGrad.addColorStop(0, '#0f172a');
+        skyGrad.addColorStop(1, '#1e293b');
+      }
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, W, H * 0.52);
+
+      if (state.weather === 'night') {
+        for (const s of stars) {
+          const alpha = 0.4 + 0.6 * Math.abs(Math.sin(state.time * 2 + s.twinkle));
+          ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+          ctx.beginPath();
+          ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(W * 0.14, H * 0.14, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(W * 0.14 + 8, H * 0.14 - 4, 19, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (state.weather === 'sunny' || state.weather === 'cloudy') {
+        const sunAlpha = state.weather === 'sunny' ? 1 : 0.45;
+        ctx.save();
+        ctx.globalAlpha = sunAlpha;
+        const glow = ctx.createRadialGradient(W * 0.14, H * 0.14, 10, W * 0.14, H * 0.14, 58);
+        glow.addColorStop(0, 'rgba(253, 224, 71, 0.95)');
+        glow.addColorStop(1, 'rgba(253, 224, 71, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(W * 0.14, H * 0.14, 58, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fde047';
+        ctx.beginPath();
+        ctx.arc(W * 0.14, H * 0.14, 24, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      if (state.weather !== 'night') {
+        const cloudColor = state.weather === 'rainy' ? '#475569' : state.weather === 'cloudy' ? '#94a3b8' : 'rgba(255,255,255,0.85)';
+        const count = state.weather === 'sunny' ? 2 : 3;
+        for (let i = 0; i < count; i++) {
+          const c = clouds[i];
+          drawCloud(c.x * W, c.y * H, 26 * c.scale, cloudColor);
+        }
+      }
+
+      const murkiness = Math.min(1, (state.dirt * 0.7 + state.ammonia * 0.3) / 100);
+      const waterTop = lerpColor([14, 165, 233], [101, 133, 72], murkiness);
+      const waterBot = lerpColor([3, 105, 161], [63, 78, 46], murkiness);
+      const lakeGrad = ctx.createLinearGradient(0, H * 0.48, 0, H);
+      lakeGrad.addColorStop(0, waterTop);
+      lakeGrad.addColorStop(1, waterBot);
+      ctx.fillStyle = lakeGrad;
+      ctx.fillRect(0, H * 0.48, W * 0.62, H * 0.52);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = 0; x <= W * 0.60; x += 12) {
+        const y = H * 0.48 + Math.sin(x * 0.04 + state.time * 3) * (state.flowSetting === 3 ? 3.5 : 1.8);
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = '#78716c';
+      ctx.beginPath();
+      ctx.moveTo(0, H * 0.92);
+      ctx.quadraticCurveTo(W * 0.25, H * 0.89, W * 0.60, H * 0.93);
+      ctx.lineTo(W * 0.60, H);
+      ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fill();
+
+      drawLakePlant(W * 0.08, H * 0.92, 55, '#15803d');
+      drawLakePlant(W * 0.13, H * 0.93, 42, '#16a34a');
+      drawLakePlant(W * 0.34, H * 0.91, 48, '#15803d');
+
+      ctx.fillStyle = '#57534e';
+      ctx.beginPath();
+      ctx.moveTo(W * 0.56, H);
+      ctx.lineTo(W * 0.58, H * 0.44);
+      ctx.lineTo(W, H * 0.44);
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(W * 0.58, H * 0.43, W * 0.42, 8);
+
+      const bx = W * 0.65, by = H * 0.45, bw = W * 0.30, bh = H * 0.43;
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(bx - 4, by, bw + 8, bh + 4);
+
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+      ctx.fillRect(bx, by, bw, bh);
+
+      if (state.layers.gravel) {
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(bx, by + bh * 0.66, bw, bh * 0.34);
+        for (let i = 0; i < 36; i++) {
+          const px = bx + 8 + ((i * 37) % (bw - 16));
+          const py = by + bh * 0.70 + ((i * 23) % (bh * 0.26));
+          ctx.fillStyle = i % 2 === 0 ? '#94a3b8' : '#475569';
+          ctx.beginPath();
+          ctx.ellipse(px, py, 7, 4.5, (i % 5) * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      if (state.layers.bacteria) {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(bx, by + bh * 0.34, bw, bh * 0.32);
+        for (let i = 0; i < 48; i++) {
+          const px = bx + 6 + ((i * 29) % (bw - 12));
+          const py = by + bh * 0.37 + ((i * 19) % (bh * 0.26));
+          ctx.fillStyle = state.microscope ? '#10b981' : '#78716c';
+          ctx.beginPath();
+          ctx.arc(px, py, state.microscope ? 3.2 : 2.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      if (state.layers.plants) {
+        ctx.strokeStyle = '#d9f99d';
+        ctx.lineWidth = 1.6;
+        for (let i = 0; i < 6; i++) {
+          const rx = bx + bw * (0.12 + i * 0.15);
+          for (let r = -1; r <= 1; r++) {
+            ctx.beginPath();
+            ctx.moveTo(rx, by + 6);
+            ctx.quadraticCurveTo(rx + r * 14, by + bh * 0.22, rx + r * 20, by + bh * 0.34);
+            ctx.stroke();
+          }
+        }
+        for (let i = 0; i < 6; i++) {
+          const rx = bx + bw * (0.12 + i * 0.15);
+          const sway = Math.sin(state.time * 2 + i) * 4;
+          ctx.strokeStyle = '#16a34a';
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.moveTo(rx, by + 4);
+          ctx.quadraticCurveTo(rx + sway * 0.5, by - 36, rx + sway, by - 68 - (i % 2) * 14);
+          ctx.stroke();
+
+          if (i % 2 === 0) {
+            ctx.fillStyle = '#78350f';
+            ctx.beginPath();
+            ctx.ellipse(rx + sway * 0.85, by - 52, 4.5, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      const labelX = bx + bw - 6;
+      if (state.layers.plants) drawTag(labelX, by + bh * 0.16, '3. Plant Roots');
+      if (state.layers.bacteria) drawTag(labelX, by + bh * 0.50, '2. Good Bacteria');
+      if (state.layers.gravel) drawTag(labelX, by + bh * 0.83, '1. Coarse Gravel');
+      ctx.textAlign = 'left';
+
+      const intakeX = W * 0.56, intakeY = H * 0.84;
+      const pumpX = W * 0.61, pumpY = H * 0.84;
+
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 11;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(intakeX, intakeY);
+      ctx.lineTo(bx + bw * 0.85, intakeY);
+      ctx.stroke();
+
+      ctx.strokeStyle = state.effectiveFlow > 0.05 ? '#38bdf8' : '#475569';
+      ctx.lineWidth = 5;
+      ctx.setLineDash(state.effectiveFlow > 0.05 ? [8, 8] : []);
+      ctx.lineDashOffset = -state.time * 60 * state.effectiveFlow;
+      ctx.beginPath();
+      ctx.moveTo(intakeX, intakeY);
+      ctx.lineTo(bx + bw * 0.85, intakeY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      drawIntakeGuard(intakeX, intakeY);
+
+      ctx.fillStyle = state.pumpActive ? '#0284c7' : '#64748b';
+      ctx.beginPath();
+      ctx.roundRect(pumpX - 16, pumpY - 15, 32, 30, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(pumpX, pumpY);
+      ctx.rotate(state.time * 8 * state.effectiveFlow);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      for (let k = 0; k < 3; k++) {
+        ctx.rotate((Math.PI * 2) / 3);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(8, 0);
+        ctx.stroke();
+      }
+      ctx.restore();
+      drawSmallLabel(pumpX, pumpY + 26, 'PUMP');
+
+      if (state.effectiveFlow > 0.05) {
+        const streamWidth = 6 + state.effectiveFlow * 6;
+        ctx.strokeStyle = 'rgba(125, 211, 252, 0.9)';
+        ctx.lineWidth = streamWidth;
+        ctx.beginPath();
+        ctx.moveTo(bx, by + 10);
+        ctx.quadraticCurveTo(W * 0.59, by + 10, W * 0.55, H * 0.49);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 10]);
+        ctx.lineDashOffset = -state.time * 85 * state.effectiveFlow;
+        ctx.beginPath();
+        ctx.moveTo(bx, by + 10);
+        ctx.quadraticCurveTo(W * 0.59, by + 10, W * 0.55, H * 0.49);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        for (let s = 0; s < 5; s++) {
+          const sx = W * 0.55 + Math.sin(state.time * 9 + s * 1.7) * 14;
+          const sy = H * 0.49 - Math.abs(Math.cos(state.time * 8 + s)) * 10 * state.effectiveFlow;
+          ctx.fillStyle = 'rgba(224, 242, 254, 0.9)';
+          ctx.beginPath();
+          ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      drawSolarAndBattery(pumpX, pumpY);
+
+      for (const p of particles) {
+        const px = p.x * W;
+        const py = p.y * H;
+        if (p.type === 'dirt') {
+          ctx.fillStyle = state.microscope ? '#92400e' : 'rgba(120, 53, 15, 0.55)';
+          ctx.beginPath();
+          ctx.arc(px, py, state.microscope ? p.r * 1.25 : p.r, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.type === 'ammonia') {
+          ctx.fillStyle = state.microscope ? '#f59e0b' : 'rgba(245, 158, 11, 0.45)';
+          ctx.beginPath();
+          ctx.arc(px, py, state.microscope ? p.r * 1.3 : p.r * 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.type === 'oxygen') {
+          ctx.strokeStyle = 'rgba(224, 242, 254, 0.85)';
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(px, py, p.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      for (const ax of axolotls) {
+        drawAxolotl(ax.x * W, ax.y * H, ax);
+      }
+
+      if (state.suctionWarningTimer > 0 && state.guard === 'none') {
+        drawCallout(intakeX - 75, intakeY - 42, 'Whoa! Strong suction!', '#ef4444');
+      }
+
+      if (state.showArrows && state.effectiveFlow > 0.05) {
+        drawFlowArrow(W * 0.47, H * 0.84, 0, 'Water IN');
+        drawFlowArrow(bx + bw * 0.35, by + bh * 0.62, -Math.PI / 2, 'Rises Up');
+        drawFlowArrow(W * 0.57, H * 0.41, Math.PI, 'Clean Stream OUT');
+      }
+
+      if (state.weather === 'rainy') {
+        ctx.strokeStyle = 'rgba(186, 230, 253, 0.65)';
+        ctx.lineWidth = 1.5;
+        for (const r of raindrops) {
+          ctx.beginPath();
+          ctx.moveTo(r.x * W, r.y * H);
+          ctx.lineTo(r.x * W - 3, r.y * H + 12);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawCloud(x, y, r, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.9, y - r * 0.25, r * 0.8, 0, Math.PI * 2);
+      ctx.arc(x + r * 1.7, y, r * 0.75, 0, Math.PI * 2);
+      ctx.arc(x - r * 0.85, y + r * 0.1, r * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawLakePlant(x, y, h, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      const sway = Math.sin(state.time * 2 + x * 0.05) * (state.flowSetting === 3 ? 10 : 4);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + sway, y - h * 0.5, x + sway * 1.4, y - h);
+      ctx.stroke();
+    }
+
+    function drawIntakeGuard(x, y) {
+      if (state.guard === 'screen') {
+        ctx.fillStyle = '#0ea5e9';
+        ctx.fillRect(x - 20, y - 14, 22, 28);
+        ctx.strokeStyle = '#e0f2fe';
+        ctx.lineWidth = 1.2;
+        for (let gy = y - 12; gy <= y + 12; gy += 4) {
+          ctx.beginPath(); ctx.moveTo(x - 20, gy); ctx.lineTo(x + 2, gy); ctx.stroke();
+        }
+        for (let gx = x - 18; gx <= x; gx += 4) {
+          ctx.beginPath(); ctx.moveTo(gx, y - 14); ctx.lineTo(gx, y + 14); ctx.stroke();
+        }
+        drawSmallLabel(x - 10, y - 22, 'FINE SCREEN');
+      } else if (state.guard === 'grating') {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(x - 16, y - 14, 18, 28);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 2.2;
+        for (let gy = y - 10; gy <= y + 10; gy += 7) {
+          ctx.beginPath(); ctx.moveTo(x - 16, gy); ctx.lineTo(x + 2, gy); ctx.stroke();
+        }
+        drawSmallLabel(x - 8, y - 22, 'GRATING');
+      } else {
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.ellipse(x - 4, y, 5, 11, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (state.effectiveFlow > 0.1) {
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
+          ctx.lineWidth = 1.6;
+          for (let a = -1; a <= 1; a++) {
+            const offset = (state.time * 30) % 24;
+            ctx.beginPath();
+            ctx.moveTo(x - 36 + offset, y + a * 12);
+            ctx.lineTo(x - 22 + offset, y + a * 5);
+            ctx.stroke();
+          }
+        }
+        drawSmallLabel(x - 12, y - 22, 'OPEN PIPE!');
+      }
+    }
+
+    function drawSolarAndBattery(pumpX, pumpY) {
+      const sx = W * 0.76, sy = H * 0.21;
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy + 12);
+      ctx.lineTo(sx, H * 0.44);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(-0.28);
+      ctx.fillStyle = '#1d4ed8';
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.roundRect(-36, -18, 72, 34, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(191, 219, 254, 0.55)';
+      ctx.lineWidth = 1;
+      for (let gx = -18; gx <= 18; gx += 18) {
+        ctx.beginPath(); ctx.moveTo(gx, -18); ctx.lineTo(gx, 16); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.moveTo(-36, -1); ctx.lineTo(36, -1); ctx.stroke();
+      ctx.restore();
+
+      if (state.solarOutput > 30) {
+        ctx.strokeStyle = 'rgba(253, 224, 71, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 6]);
+        ctx.lineDashOffset = -state.time * 40;
+        ctx.beginPath();
+        ctx.moveTo(W * 0.22, H * 0.15);
+        ctx.lineTo(sx - 20, sy - 10);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      const batX = W * 0.89, batY = H * 0.33;
+      ctx.fillStyle = state.batteryEnabled ? '#0f172a' : '#475569';
+      ctx.strokeStyle = state.batteryEnabled ? '#22c55e' : '#94a3b8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(batX - 24, batY - 16, 48, 32, 5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(batX + 24, batY - 6, 4, 12);
+      if (state.batteryEnabled) {
+        const fillW = Math.max(0, (state.batteryLevel / 100) * 40);
+        ctx.fillStyle = state.batteryLevel > 30 ? '#22c55e' : '#f59e0b';
+        ctx.fillRect(batX - 20, batY - 12, fillW, 24);
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(state.batteryEnabled ? `${Math.round(state.batteryLevel)}%` : 'OFF', batX, batY + 4);
+      drawSmallLabel(batX, batY - 22, 'BATTERY');
+      drawSmallLabel(sx, sy - 30, 'SOLAR PANEL');
+      ctx.textAlign = 'left';
+
+      ctx.strokeStyle = state.pumpActive ? '#facc15' : '#64748b';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash(state.pumpActive ? [5, 5] : []);
+      ctx.lineDashOffset = -state.time * 45;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy + 16);
+      ctx.lineTo(batX - 24, batY);
+      ctx.moveTo(batX - 10, batY + 16);
+      ctx.lineTo(batX - 10, H * 0.42);
+      ctx.lineTo(pumpX, H * 0.42);
+      ctx.lineTo(pumpX, pumpY - 15);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawAxolotl(x, y, ax) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(ax.dir * ax.size, ax.size);
+
+      const wiggle = Math.sin(ax.phase) * 3.5;
+
+      ctx.fillStyle = ax.color;
+      ctx.beginPath();
+      ctx.moveTo(-14, 0);
+      ctx.quadraticCurveTo(-28, wiggle, -38, wiggle * 0.7);
+      ctx.quadraticCurveTo(-26, 7 + wiggle * 0.5, -14, 5);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 18, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = ax.color;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-7, 8); ctx.lineTo(-10, 14);
+      ctx.moveTo(7, 8); ctx.lineTo(10, 14);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(16, 0, 11, 9.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = ax.gillColor;
+      ctx.lineWidth = 2.4;
+      const gillWave = Math.sin(ax.phase * 1.4) * 2;
+      for (let g = -1; g <= 1; g++) {
+        ctx.beginPath();
+        ctx.moveTo(8, g * 4 - 2);
+        ctx.lineTo(1 + gillWave, g * 8 - 8);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.arc(21, -2.5, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#9d174d';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      if (ax.stressed) {
+        ctx.arc(24, 3, 2.2, 0, Math.PI * 2);
+      } else {
+        ctx.arc(22, 1.5, 3.2, 0.2, Math.PI * 0.85);
+      }
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawTag(x, y, text) {
+      ctx.font = 'bold 10.5px system-ui, sans-serif';
+      const w = ctx.measureText(text).width + 10;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+      ctx.beginPath();
+      ctx.roundRect(x - w, y - 9, w, 17, 4);
+      ctx.fill();
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(text, x - 5, y + 3);
+    }
+
+    function drawSmallLabel(x, y, text) {
+      ctx.save();
+      ctx.font = 'bold 9.5px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      const w = ctx.measureText(text).width + 8;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - 8, w, 14, 3);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, x, y + 2.5);
+      ctx.restore();
+    }
+
+    function drawFlowArrow(x, y, angle, label) {
+      ctx.save();
+      ctx.translate(x, y);
+      const pulse = Math.sin(state.time * 4) * 3;
+      ctx.translate(Math.cos(angle) * pulse, Math.sin(angle) * pulse);
+
+      ctx.rotate(angle);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(12, 0);
+      ctx.lineTo(-6, -7);
+      ctx.lineTo(-2, 0);
+      ctx.lineTo(-6, 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      if (label) {
+        drawSmallLabel(x, y - 16, label);
+      }
+    }
+
+    function drawCallout(x, y, text, color) {
+      ctx.save();
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      const w = ctx.measureText(text).width + 14;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - 12, w, 22, 6);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, x, y + 3);
+      ctx.restore();
+    }
+
+    // --- Main Loop ---
+    let lastTs = performance.now();
+    function loop(ts) {
+      const dt = Math.min(0.05, (ts - lastTs) / 1000);
+      lastTs = ts;
+      stepSimulation(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    syncControlsUI();
+    updateMetricsUI(false);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
