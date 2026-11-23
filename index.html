@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bioglow Lake Lab — Solar Bog Filter Simulator</title>
-  <meta name="description" content="Interactive FIRST LEGO League Bioglow simulator helping 6th graders explore solar-powered pumps, battery backup, intake safety screens, and multi-stage bog filters for axolotl lakes." />
+  <meta name="description" content="Interactive FIRST LEGO League Bioglow simulator teaching 6th graders the best engineering choices for a solar-powered pump and multi-stage bog filter to protect axolotls." />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
@@ -45,7 +45,7 @@
     }
     canvas { display: block; width: 100%; height: 100%; }
     .pill-btn {
-      transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease;
+      transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
     }
     .pill-btn:active { transform: scale(0.97); }
     input[type="range"] { cursor: pointer; }
@@ -58,19 +58,23 @@
     <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-4 border-b border-[var(--border)]">
       <div>
         <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">
-          <span>FIRST LEGO League • Bioglow Project</span>
+          <span>FIRST LEGO League • Bioglow Research &amp; Design Lab</span>
         </div>
         <h1 class="text-2xl md:text-3xl font-bold tracking-tight mt-0.5">
-          Axolotl Lake &amp; Solar Bog Filter Lab
+          Axolotl Lake &amp; Solar Bog Filter Simulator
         </h1>
         <p class="text-sm text-[var(--muted-foreground)] mt-1">
-          Test weather, battery backup, intake guards, and multi-stage natural filtration to see how your design keeps axolotls thriving.
+          Compare your team's ideas, test what goes wrong, and discover the <strong>best engineering design</strong> to keep Lake Xochimilco's axolotls safe and healthy.
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        <button id="btn-best-design" class="pill-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--success)] bg-[var(--success)] text-white flex items-center gap-1.5 shadow-sm">
+          <span aria-hidden="true">★</span>
+          <span>Apply Best Design</span>
+        </button>
         <button id="btn-microscope" class="pill-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)] flex items-center gap-1.5">
           <span aria-hidden="true">🔬</span>
-          <span>Microscope View: <strong id="micro-label">OFF</strong></span>
+          <span>Microscope: <strong id="micro-label">OFF</strong></span>
         </button>
         <button id="btn-arrows" class="pill-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center gap-1.5">
           <span aria-hidden="true">💧</span>
@@ -82,6 +86,27 @@
         </button>
       </div>
     </header>
+
+    <!-- Best-Design Engineering Checklist Bar -->
+    <section class="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
+        <div class="flex items-center gap-2.5">
+          <span id="score-badge" class="px-2.5 py-1 rounded-full text-xs font-bold bg-[var(--success)] text-white font-mono">
+            5 / 5 Best Choices
+          </span>
+          <span id="score-message" class="text-xs md:text-sm font-medium text-[var(--foreground)]">
+            FLL Judge-Ready Design! All 5 engineering best practices are active.
+          </span>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 text-xs" id="checklist-pills">
+          <span id="pill-power" class="px-2.5 py-1 rounded-md border font-medium">✓ 24/7 Battery</span>
+          <span id="pill-intake" class="px-2.5 py-1 rounded-md border font-medium">✓ Wide Fine Screen</span>
+          <span id="pill-flow" class="px-2.5 py-1 rounded-md border font-medium">✓ Calm Flow</span>
+          <span id="pill-layers" class="px-2.5 py-1 rounded-md border font-medium">✓ 3 Filter Stages</span>
+          <span id="pill-loop" class="px-2.5 py-1 rounded-md border font-medium">✓ Active Stream</span>
+        </div>
+      </div>
+    </section>
 
     <!-- Main Grid: Canvas + Controls -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -111,20 +136,28 @@
             <div id="micro-legend" class="hidden absolute bottom-3 left-3 px-3 py-2 rounded-lg bg-[var(--card)]/90 border border-[var(--border)] text-xs backdrop-blur-sm space-y-1">
               <div class="font-semibold text-[var(--foreground)]">Microscope Key</div>
               <div class="flex flex-wrap gap-x-3 gap-y-1 text-[var(--muted-foreground)]">
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#92400e"></span> Dirt / Debris</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#f59e0b"></span> Ammonia (Toxic)</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#92400e"></span> Dirt / Mud</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#f59e0b"></span> Toxic Ammonia (NH₃)</span>
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#10b981"></span> Good Bacteria</span>
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#38bdf8"></span> Oxygen (O₂)</span>
               </div>
             </div>
           </div>
 
-          <!-- Live Explanation Banner -->
-          <div id="live-insight" class="px-4 py-3 border-t border-[var(--border)] text-xs md:text-sm bg-[var(--content)] flex items-start gap-2.5">
-            <span id="insight-icon" class="text-base leading-none mt-0.5">💡</span>
-            <p id="insight-text" class="m-0 leading-relaxed text-[var(--foreground)]">
-              Sunlight powers the pump and charges the battery backup. Dirty lake water passes through the fine screen, rises through gravel, bacteria, and plant roots, and tumbles back as a clean, oxygen-rich stream!
-            </p>
+          <!-- Live Teacher & Researcher Coaching Banner -->
+          <div id="live-insight" class="px-4 py-3.5 border-t border-[var(--border)] bg-[var(--content)] space-y-1.5">
+            <div class="flex items-start gap-2.5 text-xs md:text-sm">
+              <span id="insight-icon" class="text-base leading-none mt-0.5">✨</span>
+              <p id="insight-text" class="m-0 leading-relaxed font-medium text-[var(--foreground)]">
+                Everything is in balance! Solar energy powers the pump &amp; charges the battery, the wide fine screen protects axolotls, all 3 bog filter layers clean the water, and the return stream adds oxygen.
+              </p>
+            </div>
+            <div class="flex items-start gap-2 pl-6 text-xs text-[var(--muted-foreground)]">
+              <span class="font-bold uppercase tracking-wider text-[var(--primary)] shrink-0">Science Note:</span>
+              <p id="science-note" class="m-0 leading-relaxed">
+                Real scientists call this a "constructed wetland" or upflow bog filter—it mimics how natural marshes clean lake water without harsh chemicals.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -187,20 +220,20 @@
           <!-- 1. Weather Control -->
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold">1. Weather (Solar Input)</label>
+              <label class="text-xs font-semibold">1. Test Real-World Weather</label>
               <span id="weather-badge" class="text-xs font-mono text-[var(--muted-foreground)]">Sunny • 100%</span>
             </div>
             <div class="grid grid-cols-4 gap-1.5" id="weather-group">
-              <button data-weather="sunny" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]">
+              <button data-weather="sunny" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5">
                 <span>☀️</span><span>Sunny</span>
               </button>
-              <button data-weather="cloudy" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+              <button data-weather="cloudy" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5">
                 <span>⛅</span><span>Cloudy</span>
               </button>
-              <button data-weather="rainy" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+              <button data-weather="rainy" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5">
                 <span>🌧️</span><span>Rainy</span>
               </button>
-              <button data-weather="night" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+              <button data-weather="night" class="weather-btn pill-btn py-2 px-1 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5">
                 <span>🌙</span><span>Night</span>
               </button>
             </div>
@@ -209,7 +242,10 @@
           <!-- 2. Battery Backup -->
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold">2. Battery Backup</label>
+              <div class="flex items-center gap-1.5">
+                <label class="text-xs font-semibold">2. Battery Backup</label>
+                <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-[var(--success)]/15 text-[var(--success)]">★ Best: ON</span>
+              </div>
               <button id="btn-battery" class="pill-btn px-3 py-1 rounded-full text-xs font-semibold border border-[var(--success)] bg-[var(--success)] text-white">
                 ON
               </button>
@@ -217,26 +253,35 @@
             <div class="w-full h-2.5 rounded-full bg-[var(--border)] overflow-hidden">
               <div id="battery-bar" class="h-full rounded-full transition-all duration-200" style="width: 85%; background: var(--success);"></div>
             </div>
-            <p id="battery-desc" class="text-xs text-[var(--muted-foreground)] m-0">
-              Stores extra daytime solar energy so the pump keeps running on cloudy days and at night.
+            <p id="battery-desc" class="text-xs text-[var(--muted-foreground)] m-0 leading-relaxed">
+              <strong>Why ON is best:</strong> Beneficial bacteria in the bog filter need moving oxygenated water 24/7—even during storms and at night!
             </p>
           </div>
 
           <!-- 3. Intake Safety (Axolotl Protection) -->
           <div class="space-y-2">
-            <label class="text-xs font-semibold block">3. Intake Pipe Guard (Axolotl Safety)</label>
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold">3. Intake Guard (Axolotl Safety)</label>
+            </div>
             <div class="grid grid-cols-1 gap-1.5" id="guard-group">
-              <button data-guard="screen" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]">
-                <div class="font-semibold">Fine Screen + Small Tube (Recommended)</div>
-                <div class="opacity-85">Keeps adult &amp; baby axolotls safe; blocks big leaves.</div>
+              <button data-guard="screen" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-semibold">Wide Fine Screen + Outer Grating</span>
+                  <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-white/20 shrink-0">★ Best</span>
+                </div>
+                <div class="opacity-85 mt-0.5">Spreads suction over a wide area so even tiny baby axolotls swim past safely!</div>
               </button>
-              <button data-guard="grating" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+              <button data-guard="grating" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs">
                 <div class="font-semibold">Metal Grating Only</div>
-                <div class="opacity-75">Stops adult axolotls, but tiny babies or twigs can slip in.</div>
+                <div class="opacity-75 mt-0.5">Stops adult axolotls, but baby axolotls &amp; food critters can slip through gaps.</div>
               </button>
-              <button data-guard="none" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs border-[var(--border)] bg-[var(--content)] text-[var(--foreground)]">
+              <button data-guard="small_tube" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs">
+                <div class="font-semibold">Small Narrow Tube Only (Surprise!)</div>
+                <div class="opacity-75 mt-0.5">Smaller opening actually makes suction <em>faster</em>—like a thumb on a hose!</div>
+              </button>
+              <button data-guard="none" class="guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs">
                 <div class="font-semibold">Open Pipe (No Guard!)</div>
-                <div class="opacity-75">Danger: suction pulls curious axolotls toward the pipe!</div>
+                <div class="opacity-75 mt-0.5">Unsafe: strong suction pulls curious axolotls toward the intake.</div>
               </button>
             </div>
           </div>
@@ -244,31 +289,37 @@
           <!-- 4. Pump Flow Rate -->
           <div class="space-y-1.5">
             <div class="flex items-center justify-between">
-              <label for="flow-slider" class="text-xs font-semibold">4. Stream &amp; Pump Flow Speed</label>
-              <span id="flow-label" class="text-xs font-mono font-semibold text-[var(--success)]">Medium (Ideal)</span>
+              <label for="flow-slider" class="text-xs font-semibold">4. Stream &amp; Pump Speed</label>
+              <span id="flow-label" class="text-xs font-mono font-semibold text-[var(--success)]">Medium (★ Best)</span>
             </div>
             <input id="flow-slider" type="range" min="1" max="3" step="1" value="2" class="w-full accent-[var(--primary)]" />
             <div class="flex justify-between text-xs text-[var(--muted-foreground)]">
               <span>Gentle (Slow)</span>
-              <span>Medium (Ideal)</span>
+              <span class="font-semibold text-[var(--success)]">Medium (★ Best)</span>
               <span>Turbo (Too Fast)</span>
             </div>
+            <p class="text-xs text-[var(--muted-foreground)] m-0 pt-0.5 leading-relaxed">
+              <strong>Why Medium is best:</strong> Gives bacteria time to eat toxins while keeping currents calm for axolotls' feathery gills.
+            </p>
           </div>
 
           <!-- 5. Multi-Stage Filter Layers -->
-          <div class="space-y-2 pt-1 border-t border-[var(--border)]">
-            <label class="text-xs font-semibold block">5. Multiple Filtering Methods</label>
+          <div class="space-y-2 pt-2 border-t border-[var(--border)]">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold">5. Multiple Filtering Methods</label>
+              <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-[var(--success)]/15 text-[var(--success)]">★ Best: All 3</span>
+            </div>
             <div class="space-y-1.5 text-xs">
               <label class="flex items-center justify-between p-2 rounded-lg bg-[var(--content)] border border-[var(--border)] cursor-pointer">
-                <span><strong>Layer 1:</strong> Coarse Gravel (Traps Dirt)</span>
+                <span><strong>1. Coarse Gravel:</strong> Mechanical (Traps Mud)</span>
                 <input id="chk-gravel" type="checkbox" checked class="accent-[var(--primary)] w-4 h-4" />
               </label>
               <label class="flex items-center justify-between p-2 rounded-lg bg-[var(--content)] border border-[var(--border)] cursor-pointer">
-                <span><strong>Layer 2:</strong> Biofilm Bacteria (Eats Ammonia)</span>
+                <span><strong>2. Biofilm Bacteria:</strong> Biological (Eats Ammonia)</span>
                 <input id="chk-bacteria" type="checkbox" checked class="accent-[var(--primary)] w-4 h-4" />
               </label>
               <label class="flex items-center justify-between p-2 rounded-lg bg-[var(--content)] border border-[var(--border)] cursor-pointer">
-                <span><strong>Layer 3:</strong> Wetland Plants (Absorbs Nutrients)</span>
+                <span><strong>3. Native Plants:</strong> Roots (Absorb Nutrients)</span>
                 <input id="chk-plants" type="checkbox" checked class="accent-[var(--primary)] w-4 h-4" />
               </label>
             </div>
@@ -278,77 +329,129 @@
       </div>
     </div>
 
-    <!-- Bottom Section: Students' Whiteboard Questions Explorer -->
+    <!-- Bottom Section: Guided Research Lessons from Their Whiteboard -->
     <section class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 md:p-5 space-y-4 shadow-sm">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h2 class="text-base font-bold">Your Team's Whiteboard Questions — Click to Test!</h2>
+          <h2 class="text-base font-bold">From Your Whiteboard to FLL Judges — Compare Problems vs. Best Solutions</h2>
           <p class="text-xs text-[var(--muted-foreground)] m-0">
-            Click any question from your brainstorm board to run an experiment in the simulator above and see the science behind it.
+            For each question your team wrote down, test the <strong>problem first</strong> and then click <strong>See Best Fix</strong> to build intuition you can explain to the judges!
           </p>
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-        <!-- Q1 -->
-        <button data-preset="weather" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
-          <div>
-            <div class="text-xs font-bold text-[var(--primary)]">☀️ Weather &amp; Solar</div>
-            <div class="text-sm font-semibold mt-1">What happens on cloudy days or at night?</div>
-            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
-              Solar panels make less power in clouds and zero at night. A <strong>battery backup</strong> stores daytime energy so the lake stays clean 24/7.
-            </p>
-          </div>
-          <span class="text-xs font-semibold text-[var(--link)]">▶ Run Night + Battery Test</span>
-        </button>
 
-        <!-- Q2 -->
-        <button data-preset="stream" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+        <!-- Q1: Weather & Solar -->
+        <div data-card="weather" class="lesson-card p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] flex flex-col justify-between gap-3">
           <div>
-            <div class="text-xs font-bold text-[var(--primary)]">🔄 Stream In &amp; Out</div>
-            <div class="text-sm font-semibold mt-1">Is there a stream that goes both in and out?</div>
-            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
-              Yes! It's a <strong>closed loop</strong>: the pump pulls dirty water in through a hidden intake, and clean water tumbles back out as a gentle oxygenated stream.
-            </p>
+            <div class="text-xs font-bold text-[var(--primary)]">1. Weather &amp; Solar</div>
+            <div class="text-sm font-semibold mt-1">"How does weather affect our solar pump?"</div>
+            <div class="mt-2 p-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs leading-relaxed">
+              <div class="font-bold text-[var(--success)]">★ Best Option: Solar + Battery Backup</div>
+              <p class="text-[var(--muted-foreground)] mt-1 m-0">
+                Clouds and night drop solar power to 0%. A battery keeps the pump running 24/7 so good bacteria stay alive!
+              </p>
+            </div>
           </div>
-          <span class="text-xs font-semibold text-[var(--link)]">▶ Highlight Flow Loop</span>
-        </button>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button data-preset="weather_bad" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--error)] text-xs font-semibold text-center">
+              Test Problem
+            </button>
+            <button data-preset="weather_best" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--success)] bg-[var(--success)]/10 hover:bg-[var(--success)] hover:text-white text-[var(--success)] text-xs font-semibold text-center">
+              ★ Best Fix
+            </button>
+          </div>
+        </div>
 
-        <!-- Q3 -->
-        <button data-preset="suction" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+        <!-- Q2: Stream In & Out -->
+        <div data-card="stream" class="lesson-card p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] flex flex-col justify-between gap-3">
           <div>
-            <div class="text-xs font-bold text-[var(--primary)]">🛡️ Axolotl Safety</div>
-            <div class="text-sm font-semibold mt-1">Will axolotls get sucked in?</div>
-            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
-              Without a guard, yes! Adding a <strong>fine mesh screen, grating, and wide low-suction intake</strong> spreads out the pull so axolotls swim right past safely.
-            </p>
+            <div class="text-xs font-bold text-[var(--primary)]">2. Stream In &amp; Out</div>
+            <div class="text-sm font-semibold mt-1">"Is there a stream that goes both in and out?"</div>
+            <div class="mt-2 p-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs leading-relaxed">
+              <div class="font-bold text-[var(--success)]">★ Best Option: Closed-Loop Spillway</div>
+              <p class="text-[var(--muted-foreground)] mt-1 m-0">
+                Pull dirty water from the bottom (where waste sinks) and return clean water over rocks at the top to splash in oxygen (O₂).
+              </p>
+            </div>
           </div>
-          <span class="text-xs font-semibold text-[var(--link)]">▶ Test Open Pipe Risk</span>
-        </button>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button data-preset="stream_bad" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--error)] text-xs font-semibold text-center">
+              Test Stagnant
+            </button>
+            <button data-preset="stream_best" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--success)] bg-[var(--success)]/10 hover:bg-[var(--success)] hover:text-white text-[var(--success)] text-xs font-semibold text-center">
+              ★ Best Loop
+            </button>
+          </div>
+        </div>
 
-        <!-- Q4 -->
-        <button data-preset="multistage" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+        <!-- Q3: Axolotl Safety -->
+        <div data-card="suction" class="lesson-card p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] flex flex-col justify-between gap-3">
           <div>
-            <div class="text-xs font-bold text-[var(--primary)]">🌿 Multiple Filters</div>
-            <div class="text-sm font-semibold mt-1">How do 3 filtering methods work together?</div>
-            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
-              <strong>1. Gravel</strong> traps mud (mechanical). <strong>2. Good bacteria</strong> turn toxic ammonia into plant food (biological). <strong>3. Plant roots</strong> drink it up!
-            </p>
+            <div class="text-xs font-bold text-[var(--primary)]">3. Axolotl Safety</div>
+            <div class="text-sm font-semibold mt-1">"Will axolotls get sucked in?"</div>
+            <div class="mt-2 p-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs leading-relaxed">
+              <div class="font-bold text-[var(--success)]">★ Best Option: Wide Fine Screen + Grating</div>
+              <p class="text-[var(--muted-foreground)] mt-1 m-0">
+                A <em>small tube</em> speeds up suction! A <strong>wide</strong> fine mesh box spreads suction out so even baby axolotls stay safe.
+              </p>
+            </div>
           </div>
-          <span class="text-xs font-semibold text-[var(--link)]">▶ Open Microscope View</span>
-        </button>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button data-preset="suction_bad" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--error)] text-xs font-semibold text-center">
+              Test Small Tube
+            </button>
+            <button data-preset="suction_best" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--success)] bg-[var(--success)]/10 hover:bg-[var(--success)] hover:text-white text-[var(--success)] text-xs font-semibold text-center">
+              ★ Best Screen
+            </button>
+          </div>
+        </div>
 
-        <!-- Q5 -->
-        <button data-preset="organisms" class="preset-card pill-btn text-left p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)] flex flex-col justify-between gap-2">
+        <!-- Q4: Multiple Filtering Methods -->
+        <div data-card="multistage" class="lesson-card p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] flex flex-col justify-between gap-3">
           <div>
-            <div class="text-xs font-bold text-[var(--primary)]">🦎 Lake Organisms</div>
-            <div class="text-sm font-semibold mt-1">Will the bog filter affect organisms?</div>
-            <p class="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed">
-              It <strong>helps</strong> axolotls &amp; fish by removing toxins and adding oxygen — as long as flow stays gentle (axolotls hate strong currents!) and plants are native.
-            </p>
+            <div class="text-xs font-bold text-[var(--primary)]">4. Multiple Filters</div>
+            <div class="text-sm font-semibold mt-1">"Why use multiple filtering methods?"</div>
+            <div class="mt-2 p-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs leading-relaxed">
+              <div class="font-bold text-[var(--success)]">★ Best Option: All 3 Stages Together</div>
+              <p class="text-[var(--muted-foreground)] mt-1 m-0">
+                Gravel traps mud, bacteria convert toxic ammonia into plant food, and native roots drink it up. No single layer can do all 3!
+              </p>
+            </div>
           </div>
-          <span class="text-xs font-semibold text-[var(--link)]">▶ Test Too-Fast Current</span>
-        </button>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button data-preset="multistage_bad" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--error)] text-xs font-semibold text-center">
+              Gravel Only
+            </button>
+            <button data-preset="multistage_best" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--success)] bg-[var(--success)]/10 hover:bg-[var(--success)] hover:text-white text-[var(--success)] text-xs font-semibold text-center">
+              ★ All 3 Stages
+            </button>
+          </div>
+        </div>
+
+        <!-- Q5: Organisms -->
+        <div data-card="organisms" class="lesson-card p-3.5 rounded-xl border border-[var(--border)] bg-[var(--content)] flex flex-col justify-between gap-3">
+          <div>
+            <div class="text-xs font-bold text-[var(--primary)]">5. Lake Organisms</div>
+            <div class="text-sm font-semibold mt-1">"Will the bog filter affect organisms?"</div>
+            <div class="mt-2 p-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs leading-relaxed">
+              <div class="font-bold text-[var(--success)]">★ Best Option: Medium Flow + Native Plants</div>
+              <p class="text-[var(--muted-foreground)] mt-1 m-0">
+                Helps the whole food web (clean water + O₂), while calm flow protects axolotl gills and native plants prevent invasive weeds.
+              </p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button data-preset="organisms_bad" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--error)] text-xs font-semibold text-center">
+              Test Turbo Flow
+            </button>
+            <button data-preset="organisms_best" class="preset-btn pill-btn py-1.5 px-2 rounded-lg border border-[var(--success)] bg-[var(--success)]/10 hover:bg-[var(--success)] hover:text-white text-[var(--success)] text-xs font-semibold text-center">
+              ★ Best Habitat
+            </button>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -360,8 +463,8 @@
       weather: 'sunny',        // 'sunny' | 'cloudy' | 'rainy' | 'night'
       batteryEnabled: true,
       batteryLevel: 85,        // 0..100
-      guard: 'screen',         // 'screen' | 'grating' | 'none'
-      flowSetting: 2,          // 1 = slow, 2 = medium, 3 = fast
+      guard: 'screen',         // 'screen' | 'grating' | 'small_tube' | 'none'
+      flowSetting: 2,          // 1 = gentle, 2 = medium (best), 3 = turbo
       layers: {
         gravel: true,
         bacteria: true,
@@ -369,11 +472,12 @@
       },
       microscope: false,
       showArrows: true,
-      activePreset: null,      // 'weather' | 'stream' | 'suction' | 'multistage' | 'organisms' | null
+      activePreset: null,
+      activeCard: null,
       // Dynamic lake metrics (0..100)
-      dirt: 22,                // lower is cleaner
-      ammonia: 18,             // lower is safer
-      oxygen: 84,              // higher is better
+      dirt: 20,                // lower is cleaner
+      ammonia: 16,             // lower is safer
+      oxygen: 86,              // higher is better
       pumpActive: true,
       onBattery: false,
       weakSolar: false,
@@ -383,7 +487,7 @@
       flowPhase: 0,            // monotonic accumulator so pipes/impeller never spin backwards
       solarPhase: 0,           // monotonic accumulator for solar wire pulses
       suctionWarningTimer: 0,
-      suctionWarningType: 'none', // 'none' | 'open' | 'baby'
+      suctionWarningType: 'none', // 'none' | 'open' | 'small_tube' | 'baby'
     };
 
     // Canvas setup
@@ -414,8 +518,7 @@
     function resetAxolotls(nearIntake = false) {
       axolotls = INITIAL_AXOLOTLS.map(a => ({ ...a }));
       if (nearIntake) {
-        // Position one adult & baby closer to the intake so suction risk is immediately visible
-        axolotls[1].x = 0.45;
+        axolotls[1].x = 0.44;
         axolotls[1].y = 0.82;
         axolotls[1].vx = 0.0003;
         axolotls[2].x = 0.39;
@@ -442,7 +545,7 @@
       twinkle: Math.random() * Math.PI * 2,
     }));
 
-    function spawnInitialParticles(dirtCount = 12, ammoCount = 10, oxyCount = 16) {
+    function spawnInitialParticles(dirtCount = 10, ammoCount = 9, oxyCount = 16) {
       particles.length = 0;
       for (let i = 0; i < dirtCount; i++) particles.push(createLakeParticle('dirt'));
       for (let i = 0; i < ammoCount; i++) particles.push(createLakeParticle('ammonia'));
@@ -481,6 +584,13 @@
 
     // --- UI References ---
     const el = {
+      scoreBadge: document.getElementById('score-badge'),
+      scoreMessage: document.getElementById('score-message'),
+      pillPower: document.getElementById('pill-power'),
+      pillIntake: document.getElementById('pill-intake'),
+      pillFlow: document.getElementById('pill-flow'),
+      pillLayers: document.getElementById('pill-layers'),
+      pillLoop: document.getElementById('pill-loop'),
       statusDot: document.getElementById('status-dot'),
       statusText: document.getElementById('system-status-text'),
       powerReadout: document.getElementById('power-readout'),
@@ -488,6 +598,7 @@
       pumpReadout: document.getElementById('pump-readout'),
       insightIcon: document.getElementById('insight-icon'),
       insightText: document.getElementById('insight-text'),
+      scienceNote: document.getElementById('science-note'),
       clarityVal: document.getElementById('clarity-val'),
       clarityBar: document.getElementById('clarity-bar'),
       clarityNote: document.getElementById('clarity-note'),
@@ -503,12 +614,12 @@
       weatherBadge: document.getElementById('weather-badge'),
       btnBattery: document.getElementById('btn-battery'),
       batteryBar: document.getElementById('battery-bar'),
-      batteryDesc: document.getElementById('battery-desc'),
       flowSlider: document.getElementById('flow-slider'),
       flowLabel: document.getElementById('flow-label'),
       chkGravel: document.getElementById('chk-gravel'),
       chkBacteria: document.getElementById('chk-bacteria'),
       chkPlants: document.getElementById('chk-plants'),
+      btnBestDesign: document.getElementById('btn-best-design'),
       btnMicroscope: document.getElementById('btn-microscope'),
       microLabel: document.getElementById('micro-label'),
       microLegend: document.getElementById('micro-legend'),
@@ -518,7 +629,7 @@
       btnReset: document.getElementById('btn-reset'),
     };
 
-    // --- Power & Flow Evaluation (used both immediately on clicks and every frame) ---
+    // --- Power & Flow Evaluation ---
     function evaluatePowerState(dt) {
       const solarMap = { sunny: 100, cloudy: 45, rainy: 20, night: 0 };
       state.solarOutput = solarMap[state.weather];
@@ -561,8 +672,8 @@
       return targetFlow;
     }
 
-    // --- Clean Baseline Reset (prevents state bleed across presets & Reset Lab) ---
-    function resetToBaseline({ snapFlow = true, nearIntake = false, dirt = 22, ammonia = 18, oxygen = 84 } = {}) {
+    // --- Clean Baseline Reset ---
+    function resetToBaseline({ snapFlow = true, nearIntake = false, dirt = 20, ammonia = 16, oxygen = 86 } = {}) {
       state.weather = 'sunny';
       state.batteryEnabled = true;
       state.batteryLevel = 85;
@@ -583,9 +694,9 @@
       if (snapFlow) state.effectiveFlow = targetFlow;
     }
 
-    // Helper for manual control changes: clear active preset highlight & stale custom banner
     function onManualChange() {
       state.activePreset = null;
+      state.activeCard = null;
       customInsightTimer = 0;
       evaluatePowerState(0);
       syncControlsUI();
@@ -641,40 +752,89 @@
 
     el.btnPollute.addEventListener('click', () => {
       state.activePreset = null;
+      state.activeCard = null;
       state.dirt = Math.min(100, state.dirt + 38);
       state.ammonia = Math.min(100, state.ammonia + 32);
-      // Remove excess oxygen particles if needed so new dirt/ammonia are always visible
       for (let i = 0; i < 16; i++) {
         particles.push(createLakeParticle(i % 2 === 0 ? 'dirt' : 'ammonia'));
       }
       syncControlsUI();
       updateMetricsUI(axolotls.some(a => a.stressed));
-      updateInsight('🌧️', 'Muddy runoff just entered the lake! Watch the pump pull dirty water into the bog filter so the gravel, bacteria, and plants can clean it back up.');
+      updateInsight(
+        '🌧️',
+        'Muddy runoff just entered the lake! Watch how your bog filter pulls dirty water through gravel, bacteria, and plant roots to restore clarity.',
+        'Stormwater runoff is one of the biggest real-world threats to Lake Xochimilco—washing mud, fertilizer, and waste into axolotl canals.'
+      );
     });
 
+    function applyBestDesign() {
+      state.activePreset = null;
+      state.activeCard = null;
+      resetToBaseline({ snapFlow: true });
+      syncControlsUI();
+      updateMetricsUI(false);
+      updateInsight(
+        '★',
+        'Best Engineering Design Applied! Solar + Battery Backup, Wide Fine Screen + Outer Grating, Medium Calm Flow, and all 3 Bog Filter stages working together.',
+        'Every choice here solves a real ecological or engineering trade-off—great talking points for your FIRST LEGO League Innovation Project judges!'
+      );
+    }
+
+    el.btnBestDesign.addEventListener('click', applyBestDesign);
     el.btnReset.addEventListener('click', () => {
       state.activePreset = null;
+      state.activeCard = null;
       resetToBaseline({ snapFlow: true });
       syncControlsUI();
       updateMetricsUI(false);
     });
 
-    // Whiteboard Question Presets (each starts from a clean baseline so no old state bleeds in!)
-    document.querySelectorAll('.preset-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const p = card.dataset.preset;
+    // --- Guided Problem vs. Best Solution Presets ---
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = btn.dataset.preset;
         state.activePreset = p;
+        state.activeCard = p.split('_')[0];
 
-        if (p === 'weather') {
-          resetToBaseline({ snapFlow: true });
+        if (p === 'weather_bad') {
+          resetToBaseline({ snapFlow: false, dirt: 34, ammonia: 32, oxygen: 68 });
           state.weather = 'night';
-          state.batteryEnabled = true;
-          state.batteryLevel = 78;
+          state.batteryEnabled = false;
           state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
           updateMetricsUI(false);
-          updateInsight('🌙', 'Nighttime Test! Solar output dropped to 0%, but your Battery Backup kicked in automatically so the bog filter keeps protecting the axolotls. Try turning Battery OFF to see what happens!');
-        } else if (p === 'stream') {
+          updateInsight(
+            '🌙',
+            'Problem: At night without a Battery Backup, solar output drops to 0% and the pump completely stops! Watch oxygen fall and ammonia slowly rise.',
+            'Even worse: helpful nitrifying bacteria inside a bog filter need flowing oxygenated water—stagnant water can suffocate them overnight.'
+          );
+        } else if (p === 'weather_best') {
+          resetToBaseline({ snapFlow: true });
+          state.weather = 'night';
+          state.batteryEnabled = true;
+          state.batteryLevel = 80;
+          state.effectiveFlow = evaluatePowerState(0);
+          syncControlsUI();
+          updateMetricsUI(false);
+          updateInsight(
+            '★',
+            'Best Fix: Solar + Battery Backup! Daytime sunlight charges the battery so the green backup line automatically powers the pump all night and during rainstorms.',
+            'Using a deep-cycle LiFePO₄ battery with a solar charge controller gives 24/7 clean renewable filtration with zero fossil fuels.'
+          );
+        } else if (p === 'stream_bad') {
+          resetToBaseline({ snapFlow: false, dirt: 42, ammonia: 38, oxygen: 52 });
+          state.weather = 'night';
+          state.batteryEnabled = false;
+          state.showArrows = true;
+          state.effectiveFlow = evaluatePowerState(0);
+          syncControlsUI();
+          updateMetricsUI(false);
+          updateInsight(
+            '⚠️',
+            'Problem: Without a continuous stream moving water in and out, the lake becomes stagnant—waste settles on the bottom and dissolved oxygen drops.',
+            'Stagnant water warms up faster and grows thick algae blooms, which block sunlight and rob axolotls of oxygen.'
+          );
+        } else if (p === 'stream_best') {
           resetToBaseline({ snapFlow: true });
           state.weather = 'sunny';
           state.flowSetting = 2;
@@ -682,18 +842,53 @@
           state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
           updateMetricsUI(false);
-          updateInsight('🔄', 'Follow the blue arrows! Dirty lake water enters the screened intake pipe on the bottom, rises up through the bog filter, and flows back out as a gentle stream that adds fresh oxygen.');
-        } else if (p === 'suction') {
+          updateInsight(
+            '★',
+            'Best Fix: A Closed-Loop In-and-Out Stream! Follow the arrows: dirty bottom water is pulled in, filtered upward, and returned over rocks as a gentle oxygenated stream.',
+            'Returning water over a rocky spillway increases surface contact with air, naturally boosting dissolved oxygen (O₂) without noisy air stones.'
+          );
+        } else if (p === 'suction_bad') {
           resetToBaseline({ snapFlow: true, nearIntake: true });
           state.weather = 'sunny';
-          state.guard = 'none';
+          state.guard = 'small_tube';
           state.flowSetting = 2;
           state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
           updateMetricsUI(true);
-          updateInsight('⚠️', 'Uh-oh! With an open pipe and no guard, the pump suction pulls curious axolotls toward the intake! Switch back to "Fine Screen + Small Tube" to keep them safe.');
-        } else if (p === 'multistage') {
-          resetToBaseline({ snapFlow: true, dirt: 54, ammonia: 50 });
+          updateInsight(
+            '🧪',
+            'Surprise Physics Result! A small narrow tube actually makes water rush in FASTER (like putting your thumb over a hose), creating dangerous suction for axolotls!',
+            'Fluid Dynamics Principle (Q = A × v): For the same pump flow (Q), shrinking the opening area (A) forces water velocity (v) to shoot up!'
+          );
+        } else if (p === 'suction_best') {
+          resetToBaseline({ snapFlow: true, nearIntake: true });
+          state.weather = 'sunny';
+          state.guard = 'screen';
+          state.flowSetting = 2;
+          state.effectiveFlow = evaluatePowerState(0);
+          syncControlsUI();
+          updateMetricsUI(false);
+          updateInsight(
+            '★',
+            'Best Fix: Wide Fine Mesh Screen (≤ 2 mm) + Outer Grating! Spreading the same pump pull across a large box drops suction speed so even baby axolotls swim past safely.',
+            'Real fish-safe hydroelectric & wetland intakes use this exact trick ("low approach velocity screens") to protect tiny larvae and amphibians.'
+          );
+        } else if (p === 'multistage_bad') {
+          resetToBaseline({ snapFlow: true, dirt: 56, ammonia: 58 });
+          state.weather = 'sunny';
+          state.guard = 'screen';
+          state.microscope = true;
+          state.layers = { gravel: true, bacteria: false, plants: false };
+          state.effectiveFlow = evaluatePowerState(0);
+          syncControlsUI();
+          updateMetricsUI(false);
+          updateInsight(
+            '🔬',
+            'Problem: Gravel alone traps brown mud, but look at the amber Ammonia dots—they pass straight through the rocks and back into the axolotl lake!',
+            'Mechanical filtration (rocks/mesh) only catches solid particles. Invisible dissolved toxins like ammonia require living biological & plant filtration.'
+          );
+        } else if (p === 'multistage_best') {
+          resetToBaseline({ snapFlow: true, dirt: 56, ammonia: 54 });
           state.weather = 'sunny';
           state.guard = 'screen';
           state.microscope = true;
@@ -701,8 +896,12 @@
           state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
           updateMetricsUI(false);
-          updateInsight('🔬', 'Microscope Mode ON! Look inside the bog filter: brown dirt gets trapped in the gravel, glowing green bacteria convert toxic amber ammonia into nutrients, and plant roots absorb them!');
-        } else if (p === 'organisms') {
+          updateInsight(
+            '★',
+            'Best Fix: All 3 Filtering Methods Together! Watch Microscope View: 1) Gravel traps mud, 2) Good bacteria convert toxic ammonia, 3) Native plant roots absorb nutrients!',
+            'This mimics nature’s Nitrogen Cycle: Nitrosomonas & Nitrobacter bacteria turn toxic ammonia into nitrates, which wetland plants use as fertilizer.'
+          );
+        } else if (p === 'organisms_bad') {
           resetToBaseline({ snapFlow: true });
           state.weather = 'sunny';
           state.guard = 'screen';
@@ -710,52 +909,123 @@
           state.effectiveFlow = evaluatePowerState(0);
           syncControlsUI();
           updateMetricsUI(true);
-          updateInsight('🦎', 'Notice how "Turbo" flow stresses the axolotls! Wild axolotls live in calm canals (like Lake Xochimilco). A gentle-to-medium stream gives them clean, oxygenated water without pushing them around.');
+          updateInsight(
+            '💨',
+            'Problem: Turbo flow pushes the axolotls around and stresses them! It also rushes water through the bog filter too fast for bacteria to clean all the ammonia.',
+            'Wild axolotls in Lake Xochimilco live in calm, slow canals. Strong currents curl their delicate external gills and waste their energy swimming.'
+          );
+        } else if (p === 'organisms_best') {
+          resetToBaseline({ snapFlow: true });
+          state.weather = 'sunny';
+          state.guard = 'screen';
+          state.flowSetting = 2;
+          state.effectiveFlow = evaluatePowerState(0);
+          syncControlsUI();
+          updateMetricsUI(false);
+          updateInsight(
+            '★',
+            'Best Fix: Medium Calm Flow + Native Wetland Plants + Wide Fine Screen! The bog filter helps axolotls, fish, and helpful microbes thrive together.',
+            'Always plant native Mexican wetland species (like tule reeds & sedges) so the filter supports local biodiversity instead of spreading invasive plants.'
+          );
         }
       });
     });
 
     let customInsightTimer = 0;
-    function updateInsight(icon, text) {
+    function updateInsight(icon, text, science) {
       if (icon && text) {
         el.insightIcon.textContent = icon;
         el.insightText.textContent = text;
-        customInsightTimer = 420;
+        if (science) el.scienceNote.textContent = science;
+        customInsightTimer = 460;
         return;
       }
       if (customInsightTimer > 0) return;
 
       if (!state.pumpActive) {
         el.insightIcon.textContent = '🔋';
-        el.insightText.textContent = 'The pump stopped because there is no sunlight and no battery backup! Without water moving through the bog filter, dirt and ammonia slowly build up in the lake.';
+        el.insightText.textContent = 'The pump stopped because there is no sunlight and Battery Backup is OFF! Turn Battery Backup ON so the filter runs 24/7.';
+        el.scienceNote.textContent = 'Beneficial bacteria in a bog filter need flowing oxygenated water continuously; long shutdowns can harm the biological filter.';
       } else if (state.guard === 'none') {
         el.insightIcon.textContent = '⚠️';
-        el.insightText.textContent = 'Warning: Open intake pipe! Suction can pull axolotls toward the tube. Add a fine screen or grating to protect lake wildlife.';
+        el.insightText.textContent = 'Warning: Open intake pipe! Suction pulls axolotls toward the pipe. Switch to "Wide Fine Screen + Outer Grating" (★ Best) to protect wildlife.';
+        el.scienceNote.textContent = 'Unscreened pump intakes are a major hazard for amphibians. A wide fine-mesh pre-filter keeps intake water speed gentle and safe.';
+      } else if (state.guard === 'small_tube') {
+        el.insightIcon.textContent = '🧪';
+        el.insightText.textContent = 'Careful! A small narrow tube speeds up water velocity at the opening—creating stronger pull! Switch to "Wide Fine Screen + Outer Grating" (★ Best).';
+        el.scienceNote.textContent = 'Fluid Dynamics (Q = A × v): Same water flow through a smaller area means faster suction speed—just like putting your thumb over a garden hose!';
       } else if (state.guard === 'grating') {
         el.insightIcon.textContent = '🛡️';
-        el.insightText.textContent = 'Metal grating keeps adult axolotls safe, but tiny baby axolotls can still feel strong suction near the gaps. A fine mesh screen + small tube protects everyone!';
+        el.insightText.textContent = 'Metal grating protects adult axolotls, but tiny baby axolotls can still feel strong suction at the gaps. Add a Wide Fine Screen (★ Best) to protect everyone!';
+        el.scienceNote.textContent = 'Combining outer grating (blocks leaves/sticks) with an inner ≤ 2 mm fine mesh screen protects both adult and larval axolotls without clogging.';
       } else if (state.flowSetting === 3 && state.effectiveFlow > 0.8) {
         el.insightIcon.textContent = '💨';
-        el.insightText.textContent = 'Flow is on Turbo! Strong currents stress axolotls and push water through the bog filter too fast for bacteria to finish cleaning ammonia.';
+        el.insightText.textContent = 'Flow is on Turbo! Strong currents stress axolotls and rush water through the bog filter too fast. Switch to "Medium (★ Best)" for calm, thorough cleaning.';
+        el.scienceNote.textContent = 'Wetland filters rely on "retention time"—water needs to move slowly enough through gravel and roots for bacteria to break down ammonia.';
       } else if (!state.layers.gravel || !state.layers.bacteria || !state.layers.plants) {
         const missing = [];
-        if (!state.layers.gravel) missing.push('Gravel (dirt trap)');
-        if (!state.layers.bacteria) missing.push('Biofilm Bacteria (ammonia remover)');
-        if (!state.layers.plants) missing.push('Wetland Plants (nutrient absorber)');
+        if (!state.layers.gravel) missing.push('Coarse Gravel');
+        if (!state.layers.bacteria) missing.push('Biofilm Bacteria');
+        if (!state.layers.plants) missing.push('Native Plants');
         el.insightIcon.textContent = '🧪';
-        el.insightText.textContent = `Experimenting with missing filter layers (${missing.join(', ')})! Notice how using multiple filtering methods together cleans the lake much better than any single layer alone.`;
+        el.insightText.textContent = `Missing ${missing.join(' & ')}! Turn all 3 filter stages ON (★ Best) so mechanical, biological, and plant filtration work as a team.`;
+        el.scienceNote.textContent = 'Using multiple filtering methods is what makes your design innovative: each layer removes a different type of lake pollution.';
       } else if (state.weakSolar) {
         el.insightIcon.textContent = '⛅';
-        el.insightText.textContent = 'With Battery Backup OFF in low sunlight, the pump can only trickle slowly. Turn Battery Backup ON to keep full, steady filtration!';
+        el.insightText.textContent = 'Low sunlight with Battery Backup OFF makes the pump trickle slowly. Turn Battery Backup ON (★ Best) for steady filtration in any weather!';
+        el.scienceNote.textContent = 'Rainstorms wash extra mud into the lake right when sunlight is weakest—that is when battery backup matters most!';
       } else if (state.onBattery) {
         el.insightIcon.textContent = '🔋';
         el.insightText.textContent = state.weather === 'rainy'
-          ? 'Rainy weather lowers solar power and adds muddy runoff, but your Battery Backup keeps the pump running and the bog filter catches the extra dirt!'
-          : 'Sunlight is too low for the pump alone, so your Battery Backup is supplying steady power! Sunny weather will recharge it.';
+          ? 'Great choice! Rainy weather lowers solar power and adds muddy runoff, but your Battery Backup keeps the pump running and the bog filter catches the extra dirt!'
+          : 'Great choice! Sunlight is low, so your Battery Backup automatically took over (green wire) to keep the axolotl lake clean and oxygenated.';
+        el.scienceNote.textContent = 'Tomorrow’s sunlight will recharge the battery automatically via a solar charge controller—a completely self-sustaining loop.';
       } else {
-        el.insightIcon.textContent = '✨';
-        el.insightText.textContent = 'Everything is in balance! Solar energy powers the pump & charges the battery, the fine screen protects axolotls, all 3 bog filter layers clean the water, and the return stream adds oxygen.';
+        el.insightIcon.textContent = '★';
+        el.insightText.textContent = 'Optimal FLL Design! Solar + Battery Backup, Wide Fine Screen + Grating, Medium Calm Flow, and all 3 Bog Filter stages keep the axolotls thriving.';
+        el.scienceNote.textContent = 'Real scientists call this a "constructed wetland" or upflow bog filter—it mimics how natural marshes clean lake water without harsh chemicals.';
       }
+    }
+
+    function updateDesignChecklist() {
+      const checks = {
+        power: state.batteryEnabled,
+        intake: state.guard === 'screen',
+        flow: state.flowSetting !== 3,
+        layers: state.layers.gravel && state.layers.bacteria && state.layers.plants,
+        loop: state.pumpActive,
+      };
+      const score = Object.values(checks).filter(Boolean).length;
+
+      el.scoreBadge.textContent = `${score} / 5 Best Choices`;
+      el.scoreBadge.className = `px-2.5 py-1 rounded-full text-xs font-bold text-white font-mono ${
+        score === 5 ? 'bg-[var(--success)]' : score >= 3 ? 'bg-[var(--warning)]' : 'bg-[var(--error)]'
+      }`;
+
+      if (score === 5) {
+        el.scoreMessage.textContent = 'FLL Judge-Ready Design! All 5 engineering best practices are active.';
+      } else if (!checks.intake) {
+        el.scoreMessage.textContent = 'Tip: Upgrade the Intake Guard to "Wide Fine Screen + Outer Grating" to protect baby axolotls.';
+      } else if (!checks.power || !checks.loop) {
+        el.scoreMessage.textContent = 'Tip: Turn Battery Backup ON so the solar pump keeps running during clouds, rain, and night.';
+      } else if (!checks.layers) {
+        el.scoreMessage.textContent = 'Tip: Enable all 3 bog filter stages so mud, ammonia, and excess nutrients are all removed.';
+      } else {
+        el.scoreMessage.textContent = 'Tip: Lower pump speed to Medium so axolotls enjoy calm water and bacteria have time to clean.';
+      }
+
+      const stylePill = (node, ok, okLabel, badLabel) => {
+        node.textContent = ok ? `✓ ${okLabel}` : `✕ ${badLabel}`;
+        node.className = ok
+          ? 'px-2.5 py-1 rounded-md border border-[var(--success)]/40 bg-[var(--success)]/10 text-[var(--success)] font-medium'
+          : 'px-2.5 py-1 rounded-md border border-[var(--warning)]/50 bg-[var(--warning)]/10 text-[var(--warning)] font-medium';
+      };
+
+      stylePill(el.pillPower, checks.power, '24/7 Battery', 'No Battery');
+      stylePill(el.pillIntake, checks.intake, 'Wide Fine Screen', 'Unsafe Intake');
+      stylePill(el.pillFlow, checks.flow, 'Calm Flow', 'Too Fast');
+      stylePill(el.pillLayers, checks.layers, '3 Filter Stages', 'Missing Stage');
+      stylePill(el.pillLoop, checks.loop, 'Active Stream', 'Pump Stopped');
     }
 
     function syncControlsUI() {
@@ -778,11 +1048,14 @@
 
       document.querySelectorAll('.guard-btn').forEach(btn => {
         const active = btn.dataset.guard === state.guard;
+        const dangerous = state.guard === 'none' || state.guard === 'small_tube';
         btn.className = `guard-btn pill-btn text-left px-3 py-2 rounded-lg border text-xs ${
           active
-            ? (state.guard === 'none'
+            ? (dangerous
                 ? 'border-[var(--error)] bg-[var(--error)] text-white'
-                : 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]')
+                : state.guard === 'screen'
+                  ? 'border-[var(--success)] bg-[var(--success)] text-white'
+                  : 'border-[var(--warning)] bg-[var(--warning)] text-white')
             : 'border-[var(--border)] bg-[var(--content)] text-[var(--foreground)] hover:border-[var(--primary)]'
         }`;
       });
@@ -797,7 +1070,7 @@
       el.flowSlider.value = state.flowSetting;
       const flowLabels = {
         1: ['Gentle (Slow)', 'text-[var(--muted-foreground)]'],
-        2: ['Medium (Ideal)', 'text-[var(--success)]'],
+        2: ['Medium (★ Best)', 'text-[var(--success)]'],
         3: ['Turbo (Too Fast)', 'text-[var(--warning)]'],
       };
       el.flowLabel.textContent = flowLabels[state.flowSetting][0];
@@ -822,23 +1095,24 @@
           : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]'
       }`;
 
-      // Highlight active Whiteboard Question preset card
-      document.querySelectorAll('.preset-card').forEach(card => {
-        const active = card.dataset.preset === state.activePreset;
-        card.className = `preset-card pill-btn text-left p-3.5 rounded-xl border flex flex-col justify-between gap-2 ${
+      // Highlight active lesson card
+      document.querySelectorAll('.lesson-card').forEach(card => {
+        const active = card.dataset.card === state.activeCard;
+        card.className = `lesson-card p-3.5 rounded-xl border flex flex-col justify-between gap-3 ${
           active
-            ? 'border-[var(--primary)] bg-[var(--card)] ring-2 ring-[var(--primary)]/30'
-            : 'border-[var(--border)] bg-[var(--content)] hover:border-[var(--primary)]'
+            ? 'border-[var(--primary)] bg-[var(--card)] ring-2 ring-[var(--primary)]/25'
+            : 'border-[var(--border)] bg-[var(--content)]'
         }`;
       });
 
+      updateDesignChecklist();
       updateInsight();
     }
 
     // --- Simulation Physics & Ecology Step ---
     let uiTickAccumulator = 0;
     function stepSimulation(dt) {
-      const step = dt * 60; // normalize to 60fps so 120Hz screens run at same speed
+      const step = dt * 60;
       state.time += dt;
       if (customInsightTimer > 0) customInsightTimer = Math.max(0, customInsightTimer - step);
 
@@ -846,7 +1120,6 @@
       state.effectiveFlow += (targetFlow - state.effectiveFlow) * Math.min(1, 0.08 * step);
       if (Math.abs(state.effectiveFlow) < 0.005 && targetFlow === 0) state.effectiveFlow = 0;
 
-      // Monotonic animation phases (never spin or flow backwards when slowing down!)
       state.flowPhase += dt * state.effectiveFlow;
       if (state.solarOutput > 0) state.solarPhase += dt * (state.solarOutput / 100);
 
@@ -880,20 +1153,34 @@
         ax.stressed = false;
 
         if (state.effectiveFlow > 0.1) {
-          const pullRadius = state.guard === 'none' ? 0.28 : state.guard === 'grating' ? (ax.baby ? 0.18 : 0.09) : 0.06;
+          const isHighSuction = state.guard === 'none' || state.guard === 'small_tube';
+          const pullRadius = state.guard === 'small_tube'
+            ? 0.30
+            : state.guard === 'none'
+              ? 0.28
+              : state.guard === 'grating'
+                ? (ax.baby ? 0.18 : 0.09)
+                : 0.055;
+
           if (dist < pullRadius && dist > 0.01) {
-            const pullStrength = (state.guard === 'none' ? 0.0020 : state.guard === 'grating' && ax.baby ? 0.0012 : 0.0002) * state.effectiveFlow;
+            const pullStrength = (
+              state.guard === 'small_tube' ? 0.0024
+              : state.guard === 'none' ? 0.0020
+              : state.guard === 'grating' && ax.baby ? 0.0012
+              : 0.00018
+            ) * state.effectiveFlow;
+
             ax.vx += (dx / dist) * pullStrength * 0.18 * step;
             ax.vy += (dy / dist) * pullStrength * 0.18 * step;
 
-            if (state.guard === 'none' || (state.guard === 'grating' && ax.baby)) {
+            if (isHighSuction || (state.guard === 'grating' && ax.baby)) {
               ax.stressed = true;
               anyStressed = true;
               if (dist < 0.065) {
                 ax.vx = -0.0032;
                 ax.vy = -0.0016;
                 state.suctionWarningTimer = 75;
-                state.suctionWarningType = state.guard === 'none' ? 'open' : 'baby';
+                state.suctionWarningType = state.guard === 'small_tube' ? 'small_tube' : state.guard === 'none' ? 'open' : 'baby';
               }
             }
           }
@@ -976,7 +1263,6 @@
             if (p.y > 0.91) p.y = 0.91;
           }
         } else if (p.zone === 'bog') {
-          // Only rise when water is actually being pumped through the bog filter!
           if (state.effectiveFlow > 0.02) {
             const riseSpeed = 0.0014 * state.effectiveFlow * step;
             p.y -= riseSpeed;
@@ -1034,7 +1320,7 @@
       const oxygen = Math.round(state.oxygen);
 
       let health = clarity * 0.35 + (100 - ammonia) * 0.35 + oxygen * 0.30;
-      if (state.guard === 'none' && state.effectiveFlow > 0.1) health -= 30;
+      if ((state.guard === 'none' || state.guard === 'small_tube') && state.effectiveFlow > 0.1) health -= 30;
       if (state.flowSetting === 3 && state.effectiveFlow > 0.8) health -= 22;
       health = Math.round(Math.max(5, Math.min(100, health)));
 
@@ -1048,9 +1334,11 @@
       if (!state.pumpActive) {
         el.statusDot.style.background = 'var(--error)';
         el.statusText.textContent = 'Pump Stopped — Needs Sunlight or Battery Backup';
-      } else if (state.guard === 'none') {
+      } else if (state.guard === 'none' || state.guard === 'small_tube') {
         el.statusDot.style.background = 'var(--warning)';
-        el.statusText.textContent = 'Running — Warning: Unprotected Intake Pipe!';
+        el.statusText.textContent = state.guard === 'small_tube'
+          ? 'Running — Warning: Small Tube Creates Fast Suction!'
+          : 'Running — Warning: Unprotected Intake Pipe!';
       } else if (state.weakSolar) {
         el.statusDot.style.background = 'var(--warning)';
         el.statusText.textContent = 'Running Slowly — Low Sunlight & Battery OFF';
@@ -1080,9 +1368,9 @@
         el.axolotlVal.textContent = 'Happy';
         el.axolotlNote.textContent = 'Safe & thriving';
         el.axolotlBar.style.background = '#ec4899';
-      } else if (state.guard === 'none' && state.effectiveFlow > 0.1) {
+      } else if ((state.guard === 'none' || state.guard === 'small_tube') && state.effectiveFlow > 0.1) {
         el.axolotlVal.textContent = 'At Risk!';
-        el.axolotlNote.textContent = 'Needs intake screen!';
+        el.axolotlNote.textContent = 'Needs wide screen!';
         el.axolotlBar.style.background = 'var(--error)';
       } else if (state.flowSetting === 3 && state.effectiveFlow > 0.8) {
         el.axolotlVal.textContent = 'Stressed';
@@ -1094,6 +1382,7 @@
         el.axolotlBar.style.background = 'var(--warning)';
       }
 
+      updateDesignChecklist();
       updateInsight();
     }
 
@@ -1182,7 +1471,7 @@
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (let x = 0; x <= W * 0.60; x += 12) {
-        const y = H * 0.48 + Math.sin(x * 0.04 + state.time * 3) * (state.flowSetting === 3 ? 3.5 : 1.8);
+        const y = H * 0.48 + Math.sin(x * 0.04 + state.time * 3) * (state.flowSetting === 3 && state.effectiveFlow > 0.6 ? 3.5 : 1.8);
         if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
@@ -1279,7 +1568,7 @@
       ctx.font = 'bold 11px system-ui, sans-serif';
       ctx.textAlign = 'right';
       const labelX = bx + bw - 6;
-      if (state.layers.plants) drawTag(labelX, by + bh * 0.16, '3. Plant Roots');
+      if (state.layers.plants) drawTag(labelX, by + bh * 0.16, '3. Native Roots');
       if (state.layers.bacteria) drawTag(labelX, by + bh * 0.50, '2. Good Bacteria');
       if (state.layers.gravel) drawTag(labelX, by + bh * 0.83, '1. Coarse Gravel');
       ctx.textAlign = 'left';
@@ -1389,10 +1678,14 @@
         drawAxolotl(ax.x * W, ax.y * H, ax);
       }
 
-      if (state.suctionWarningTimer > 0 && state.guard === 'none') {
-        drawCallout(intakeX - 75, intakeY - 42, 'Whoa! Strong suction!', '#ef4444');
-      } else if (state.suctionWarningTimer > 0 && state.guard === 'grating' && state.suctionWarningType === 'baby') {
-        drawCallout(intakeX - 78, intakeY - 42, 'Careful! Baby axolotl!', '#d97706');
+      if (state.suctionWarningTimer > 0) {
+        if (state.guard === 'small_tube' && state.suctionWarningType === 'small_tube') {
+          drawCallout(intakeX - 88, intakeY - 42, 'Fast suction in small tube!', '#ef4444');
+        } else if (state.guard === 'none' && state.suctionWarningType === 'open') {
+          drawCallout(intakeX - 75, intakeY - 42, 'Whoa! Strong suction!', '#ef4444');
+        } else if (state.guard === 'grating' && state.suctionWarningType === 'baby') {
+          drawCallout(intakeX - 78, intakeY - 42, 'Careful! Baby axolotl!', '#d97706');
+        }
       }
 
       if (state.showArrows && state.effectiveFlow > 0.05) {
@@ -1436,17 +1729,22 @@
 
     function drawIntakeGuard(x, y) {
       if (state.guard === 'screen') {
+        // Wide fine mesh box + outer protective grating (spreads suction over large area!)
         ctx.fillStyle = '#0ea5e9';
-        ctx.fillRect(x - 20, y - 14, 22, 28);
+        ctx.fillRect(x - 26, y - 18, 28, 36);
         ctx.strokeStyle = '#e0f2fe';
-        ctx.lineWidth = 1.2;
-        for (let gy = y - 12; gy <= y + 12; gy += 4) {
-          ctx.beginPath(); ctx.moveTo(x - 20, gy); ctx.lineTo(x + 2, gy); ctx.stroke();
+        ctx.lineWidth = 1.1;
+        for (let gy = y - 15; gy <= y + 15; gy += 4) {
+          ctx.beginPath(); ctx.moveTo(x - 26, gy); ctx.lineTo(x + 2, gy); ctx.stroke();
         }
-        for (let gx = x - 18; gx <= x; gx += 4) {
-          ctx.beginPath(); ctx.moveTo(gx, y - 14); ctx.lineTo(gx, y + 14); ctx.stroke();
+        for (let gx = x - 24; gx <= x; gx += 4) {
+          ctx.beginPath(); ctx.moveTo(gx, y - 18); ctx.lineTo(gx, y + 18); ctx.stroke();
         }
-        drawSmallLabel(x - 10, y - 22, 'FINE SCREEN');
+        // Outer protective cage frame
+        ctx.strokeStyle = '#16a34a';
+        ctx.lineWidth = 2.2;
+        ctx.strokeRect(x - 27, y - 19, 30, 38);
+        drawSmallLabel(x - 12, y - 27, '★ WIDE SCREEN');
       } else if (state.guard === 'grating') {
         ctx.fillStyle = '#475569';
         ctx.fillRect(x - 16, y - 14, 18, 28);
@@ -1456,6 +1754,26 @@
           ctx.beginPath(); ctx.moveTo(x - 16, gy); ctx.lineTo(x + 2, gy); ctx.stroke();
         }
         drawSmallLabel(x - 8, y - 22, 'GRATING');
+      } else if (state.guard === 'small_tube') {
+        // Narrow nozzle tube showing high-velocity concentrated suction!
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(x - 22, y - 4, 22, 8);
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.ellipse(x - 22, y, 3, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (state.effectiveFlow > 0.1) {
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)';
+          ctx.lineWidth = 2;
+          for (let a = -1; a <= 1; a++) {
+            const offset = (state.flowPhase * 52) % 26;
+            ctx.beginPath();
+            ctx.moveTo(x - 52 + offset, y + a * 11);
+            ctx.lineTo(x - 34 + offset, y + a * 3);
+            ctx.stroke();
+          }
+        }
+        drawSmallLabel(x - 16, y - 18, 'SMALL TUBE!');
       } else {
         ctx.fillStyle = '#1e293b';
         ctx.beginPath();
@@ -1538,7 +1856,7 @@
       drawSmallLabel(sx, sy - 30, 'SOLAR PANEL');
       ctx.textAlign = 'left';
 
-      // Wire 1: Solar Panel -> Battery/Controller (only energized when sunlight > 0)
+      // Wire 1: Solar Panel -> Battery/Controller
       ctx.strokeStyle = state.solarOutput > 0 ? '#facc15' : '#64748b';
       ctx.lineWidth = 2.5;
       ctx.setLineDash(state.solarOutput > 0 ? [5, 5] : []);
@@ -1549,7 +1867,7 @@
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Wire 2: Controller/Battery -> Pump (yellow on solar, green on battery backup, gray when stopped)
+      // Wire 2: Controller/Battery -> Pump
       ctx.strokeStyle = !state.pumpActive ? '#64748b' : state.onBattery ? '#22c55e' : '#facc15';
       ctx.lineWidth = 2.5;
       ctx.setLineDash(state.pumpActive ? [5, 5] : []);
