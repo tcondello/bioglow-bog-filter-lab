@@ -87,6 +87,34 @@
       </div>
     </header>
 
+    <!-- Filter Direction Tabs & Trade-Off Explanation -->
+    <section class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+        <div class="inline-flex rounded-lg p-1 bg-[var(--content)] border border-[var(--border)] gap-1" role="tablist" aria-label="Bog filter flow direction">
+          <button id="tab-upflow" role="tab" aria-selected="true" data-mode="upflow" class="mode-tab pill-btn px-3.5 py-2 rounded-md text-xs font-semibold border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center gap-1.5">
+            <span>⬆️</span>
+            <span>Upflow (Bottom → Top)</span>
+            <span class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-white/20">★ Best</span>
+          </button>
+          <button id="tab-downflow" role="tab" aria-selected="false" data-mode="downflow" class="mode-tab pill-btn px-3.5 py-2 rounded-md text-xs font-semibold border border-transparent text-[var(--foreground)] hover:border-[var(--primary)] flex items-center gap-1.5">
+            <span>⬇️</span>
+            <span>Top-Down Flow (Gravity Prototype)</span>
+          </button>
+        </div>
+        <span id="mode-badge" class="text-xs font-semibold text-[var(--primary)]">
+          Viewing: Upflow Bog Filter (Permanent Pond Design)
+        </span>
+      </div>
+
+      <!-- Trade-Off Paragraph -->
+      <div id="tradeoff-box" class="rounded-lg border border-[var(--border)] bg-[var(--content)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--foreground)]">
+        <strong class="text-[var(--primary)]">Engineering Trade-Off (Upflow vs. Top-Down):</strong>
+        <span id="tradeoff-text">
+          <strong>Upflow (bottom-to-top)</strong> is the gold standard for permanent ponds because heavy mud settles at the bottom where it can be flushed out, water spreads evenly without shortcutting, and clean water overflows naturally back into the lake. However, if your team's prototype equipment requires <strong>top-down gravity flow</strong>, click the second tab to see how pumping water to a <strong>top spray bar</strong> and letting gravity pull it down through an elevated filter box works—just know the trade-off: mud hits the top layer first (so it clogs faster and needs a removable top pre-filter pad you can rinse) and the filter box must sit <em>higher</em> than the lake so clean water can drain out the bottom.
+        </span>
+      </div>
+    </section>
+
     <!-- Best-Design Engineering Checklist Bar -->
     <section class="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
@@ -460,6 +488,7 @@
   <script>
     // --- Simulation State ---
     const state = {
+      flowMode: 'upflow',      // 'upflow' | 'downflow'
       weather: 'sunny',        // 'sunny' | 'cloudy' | 'rainy' | 'night'
       batteryEnabled: true,
       batteryLevel: 85,        // 0..100
@@ -556,11 +585,12 @@
     function createLakeParticle(forceType) {
       const r = Math.random();
       const type = forceType || (r < 0.38 ? 'dirt' : r < 0.72 ? 'ammonia' : 'oxygen');
+      const lakeTop = state.flowMode === 'downflow' ? 0.62 : 0.52;
       return {
         zone: 'lake',
         type,
         x: 0.04 + Math.random() * 0.50,
-        y: 0.52 + Math.random() * 0.38,
+        y: lakeTop + Math.random() * (0.90 - lakeTop),
         vx: (Math.random() - 0.5) * 0.0008,
         vy: (Math.random() - 0.5) * 0.0005,
         r: type === 'dirt' ? 3.2 : type === 'ammonia' ? 2.8 : 2.6,
@@ -569,12 +599,13 @@
     }
 
     function createBogParticle() {
+      const isDown = state.flowMode === 'downflow';
       return {
         zone: 'bog',
         type: Math.random() < 0.5 ? 'dirt' : 'ammonia',
         x: 0.67 + Math.random() * 0.27,
-        y: 0.50 + Math.random() * 0.35,
-        vy: -0.0012,
+        y: isDown ? (0.37 + Math.random() * 0.22) : (0.50 + Math.random() * 0.35),
+        vy: isDown ? 0.0012 : -0.0012,
         r: 2.8,
         cleaned: false,
       };
@@ -584,6 +615,8 @@
 
     // --- UI References ---
     const el = {
+      modeBadge: document.getElementById('mode-badge'),
+      tradeoffText: document.getElementById('tradeoff-text'),
       scoreBadge: document.getElementById('score-badge'),
       scoreMessage: document.getElementById('score-message'),
       pillPower: document.getElementById('pill-power'),
@@ -704,6 +737,31 @@
     }
 
     // --- Event Listeners ---
+    document.querySelectorAll('.mode-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        if (state.flowMode === tab.dataset.mode) return;
+        state.flowMode = tab.dataset.mode;
+        state.activePreset = null;
+        state.activeCard = null;
+        resetToBaseline({ snapFlow: true });
+        syncControlsUI();
+        updateMetricsUI(false);
+        if (state.flowMode === 'downflow') {
+          updateInsight(
+            '⬇️',
+            'Top-Down Gravity Prototype Mode! The pump lifts dirty water to a top spray bar, gravity pulls it down through the layers, and clean water drains out the bottom into the lake.',
+            'Trade-off tip: Add a removable coarse sponge/gravel pad on top so trapped mud can be rinsed easily, and keep the filter box elevated above the lake surface.'
+          );
+        } else {
+          updateInsight(
+            '⬆️',
+            'Upflow Bog Filter Mode (★ Best for Permanent Ponds)! Dirty water enters the coarse rock bottom, rises evenly through bacteria and roots, and overflows back into the lake.',
+            'Upflow prevents top clogging and spreads water evenly across the whole gravel bed without shortcutting.'
+          );
+        }
+      });
+    });
+
     document.querySelectorAll('.weather-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         state.weather = btn.dataset.weather;
@@ -1105,6 +1163,25 @@
         }`;
       });
 
+      // Sync Upflow / Top-Down tab styles & trade-off text
+      document.querySelectorAll('.mode-tab').forEach(tab => {
+        const active = tab.dataset.mode === state.flowMode;
+        tab.setAttribute('aria-selected', String(active));
+        tab.className = `mode-tab pill-btn px-3.5 py-2 rounded-md text-xs font-semibold border flex items-center gap-1.5 ${
+          active
+            ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]'
+            : 'border-transparent text-[var(--foreground)] hover:border-[var(--primary)]'
+        }`;
+      });
+
+      if (state.flowMode === 'downflow') {
+        el.modeBadge.textContent = 'Viewing: Top-Down Gravity Prototype (Adapted for Team Equipment)';
+        el.tradeoffText.innerHTML = '<strong>Top-Down Flow (Gravity Prototype)</strong> is easier to build with standard classroom pumps and tubs—water is pumped to a <strong>top spray bar</strong>, gravity pulls it down through the layers, and clean water drains out the bottom back into the lake. <strong>The trade-off:</strong> mud hits the top layer first (so it clogs faster than upflow), water can take shortcuts ("channeling") unless spread evenly with a spray bar, and the filter box must sit <em>higher</em> than the lake surface. <strong>Smart fix:</strong> put a removable coarse sponge/gravel pad on top so you can rinse out mud easily!';
+      } else {
+        el.modeBadge.textContent = 'Viewing: Upflow Bog Filter (Permanent Pond Design)';
+        el.tradeoffText.innerHTML = '<strong>Upflow (bottom-to-top)</strong> is the gold standard for permanent ponds because heavy mud settles at the bottom where it can be flushed out, water spreads evenly without shortcutting, and clean water overflows naturally back into the lake. If your team\'s prototype equipment requires <strong>top-down gravity flow</strong>, click the second tab to see how it works and what trade-offs to manage (top clogging, spray-bar distribution, and elevating the filter box above the lake).';
+      }
+
       updateDesignChecklist();
       updateInsight();
     }
@@ -1202,9 +1279,11 @@
         ax.x += ax.vx * step;
         ax.y += ax.vy * step;
 
+        const lakeSurfaceY = state.flowMode === 'downflow' ? 0.60 : 0.48;
+        const axMinY = lakeSurfaceY + 0.08;
         if (ax.x < 0.07) { ax.x = 0.07; ax.vx = Math.abs(ax.vx) + 0.0004; }
         if (ax.x > 0.51) { ax.x = 0.51; ax.vx = -Math.abs(ax.vx) - 0.0004; }
-        if (ax.y < 0.56) { ax.y = 0.56; ax.vy = Math.abs(ax.vy) + 0.0002; }
+        if (ax.y < axMinY) { ax.y = axMinY; ax.vy = Math.abs(ax.vy) + 0.0002; }
         if (ax.y > 0.88) { ax.y = 0.88; ax.vy = -Math.abs(ax.vy) - 0.0002; }
 
         if (Math.abs(ax.vx) > 0.0001) {
@@ -1218,6 +1297,8 @@
 
       const targetDirtCount = Math.round(state.dirt * 0.35);
       const targetAmmoCount = Math.round(state.ammonia * 0.30);
+      const isDown = state.flowMode === 'downflow';
+      const lakeSurfaceY = isDown ? 0.60 : 0.48;
       let oxyCount = 0;
 
       for (let i = particles.length - 1; i >= 0; i--) {
@@ -1231,10 +1312,10 @@
             }
             p.y -= 0.0009 * step;
             p.x += Math.sin(state.time * 3 + i) * 0.0003 * step;
-            if (p.y < 0.48) {
+            if (p.y < lakeSurfaceY) {
               if (state.effectiveFlow > 0.1) {
                 p.x = 0.53 + (Math.random() - 0.5) * 0.12;
-                p.y = 0.52 + Math.random() * 0.22;
+                p.y = lakeSurfaceY + 0.03 + Math.random() * 0.18;
               } else {
                 p.y = 0.88;
                 p.x = 0.08 + Math.random() * 0.44;
@@ -1250,7 +1331,7 @@
               if (d < 0.045) {
                 p.zone = 'bog';
                 p.x = 0.67 + Math.random() * 0.27;
-                p.y = 0.85;
+                p.y = isDown ? 0.365 : 0.85;
                 p.cleaned = false;
               }
             } else {
@@ -1259,31 +1340,58 @@
             }
             if (p.x < 0.03) p.x = 0.52;
             if (p.x > 0.56) p.x = 0.06;
-            if (p.y < 0.50) p.y = 0.50;
+            if (p.y < lakeSurfaceY + 0.02) p.y = lakeSurfaceY + 0.02;
             if (p.y > 0.91) p.y = 0.91;
           }
         } else if (p.zone === 'bog') {
           if (state.effectiveFlow > 0.02) {
-            const riseSpeed = 0.0014 * state.effectiveFlow * step;
-            p.y -= riseSpeed;
-            p.x += Math.sin(state.time * 4 + i) * 0.00025 * step;
+            if (isDown) {
+              // Top-Down Gravity Flow: enters at top (0.36), filters down to bottom drain (0.60)
+              const fallSpeed = 0.0011 * state.effectiveFlow * step;
+              p.y += fallSpeed;
+              p.x += Math.sin(state.time * 4 + i) * 0.00025 * step;
 
-            if (p.type === 'dirt' && state.layers.gravel && p.y < 0.78 && Math.random() < 0.06 * step) {
-              p.cleaned = true;
-            }
-            if (p.type === 'ammonia' && state.layers.bacteria && p.y < 0.66 && Math.random() < 0.06 * step) {
-              p.cleaned = true;
-            }
-            if (state.layers.plants && p.y < 0.53 && Math.random() < 0.08 * step) {
-              p.cleaned = true;
-            }
+              if (p.type === 'dirt' && state.layers.gravel && p.y > 0.41 && Math.random() < 0.07 * step) {
+                p.cleaned = true;
+              }
+              if (p.type === 'ammonia' && state.layers.bacteria && p.y > 0.48 && Math.random() < 0.07 * step) {
+                p.cleaned = true;
+              }
+              if (state.layers.plants && p.y > 0.43 && Math.random() < 0.07 * step) {
+                p.cleaned = true;
+              }
 
-            if (p.y < 0.43) {
-              p.zone = 'lake';
-              p.x = 0.50 + Math.random() * 0.08;
-              p.y = 0.50 + Math.random() * 0.08;
-              if (p.cleaned) {
-                p.type = 'oxygen';
+              if (p.y > 0.60) {
+                p.zone = 'lake';
+                p.x = 0.51 + Math.random() * 0.07;
+                p.y = lakeSurfaceY + 0.02 + Math.random() * 0.06;
+                if (p.cleaned) {
+                  p.type = 'oxygen';
+                }
+              }
+            } else {
+              // Upflow: enters at bottom (0.85), rises up to top overflow (0.43)
+              const riseSpeed = 0.0014 * state.effectiveFlow * step;
+              p.y -= riseSpeed;
+              p.x += Math.sin(state.time * 4 + i) * 0.00025 * step;
+
+              if (p.type === 'dirt' && state.layers.gravel && p.y < 0.78 && Math.random() < 0.06 * step) {
+                p.cleaned = true;
+              }
+              if (p.type === 'ammonia' && state.layers.bacteria && p.y < 0.66 && Math.random() < 0.06 * step) {
+                p.cleaned = true;
+              }
+              if (state.layers.plants && p.y < 0.53 && Math.random() < 0.08 * step) {
+                p.cleaned = true;
+              }
+
+              if (p.y < 0.43) {
+                p.zone = 'lake';
+                p.x = 0.50 + Math.random() * 0.08;
+                p.y = 0.50 + Math.random() * 0.08;
+                if (p.cleaned) {
+                  p.type = 'oxygen';
+                }
               }
             }
           }
@@ -1458,20 +1566,22 @@
         }
       }
 
+      const isDown = state.flowMode === 'downflow';
+      const lakeSurfaceY = isDown ? H * 0.60 : H * 0.48;
       const murkiness = Math.min(1, (state.dirt * 0.7 + state.ammonia * 0.3) / 100);
       const waterTop = lerpColor([14, 165, 233], [101, 133, 72], murkiness);
       const waterBot = lerpColor([3, 105, 161], [63, 78, 46], murkiness);
-      const lakeGrad = ctx.createLinearGradient(0, H * 0.48, 0, H);
+      const lakeGrad = ctx.createLinearGradient(0, lakeSurfaceY, 0, H);
       lakeGrad.addColorStop(0, waterTop);
       lakeGrad.addColorStop(1, waterBot);
       ctx.fillStyle = lakeGrad;
-      ctx.fillRect(0, H * 0.48, W * 0.62, H * 0.52);
+      ctx.fillRect(0, lakeSurfaceY, W * 0.62, H - lakeSurfaceY);
 
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (let x = 0; x <= W * 0.60; x += 12) {
-        const y = H * 0.48 + Math.sin(x * 0.04 + state.time * 3) * (state.flowSetting === 3 && state.effectiveFlow > 0.6 ? 3.5 : 1.8);
+        const y = lakeSurfaceY + Math.sin(x * 0.04 + state.time * 3) * (state.flowSetting === 3 && state.effectiveFlow > 0.6 ? 3.5 : 1.8);
         if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
@@ -1489,77 +1599,135 @@
       drawLakePlant(W * 0.13, H * 0.93, 42, '#16a34a');
       drawLakePlant(W * 0.34, H * 0.91, 48, '#15803d');
 
+      const bankTopY = isDown ? H * 0.59 : H * 0.44;
       ctx.fillStyle = '#57534e';
       ctx.beginPath();
       ctx.moveTo(W * 0.56, H);
-      ctx.lineTo(W * 0.58, H * 0.44);
-      ctx.lineTo(W, H * 0.44);
+      ctx.lineTo(W * 0.58, bankTopY);
+      ctx.lineTo(W, bankTopY);
       ctx.lineTo(W, H);
       ctx.closePath();
       ctx.fill();
 
       ctx.fillStyle = '#22c55e';
-      ctx.fillRect(W * 0.58, H * 0.43, W * 0.42, 8);
+      ctx.fillRect(W * 0.58, bankTopY - 2, W * 0.42, 8);
 
-      const bx = W * 0.65, by = H * 0.45, bw = W * 0.30, bh = H * 0.43;
+      // Bog Filter Basin Geometry (elevated above lake in Top-Down mode so gravity drains cleanly!)
+      const bx = W * 0.65;
+      const bw = W * 0.30;
+      const by = isDown ? H * 0.35 : H * 0.45;
+      const bh = isDown ? H * 0.25 : H * 0.43;
+
+      // Support stand under elevated box in Top-Down mode
+      if (isDown) {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(bx + 12, by + bh, 10, bankTopY - (by + bh) + 2);
+        ctx.fillRect(bx + bw - 22, by + bh, 10, bankTopY - (by + bh) + 2);
+      }
+
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(bx - 4, by, bw + 8, bh + 4);
 
       ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
       ctx.fillRect(bx, by, bw, bh);
 
-      if (state.layers.gravel) {
-        ctx.fillStyle = '#64748b';
-        ctx.fillRect(bx, by + bh * 0.66, bw, bh * 0.34);
-        for (let i = 0; i < 36; i++) {
-          const px = bx + 8 + ((i * 37) % (bw - 16));
-          const py = by + bh * 0.70 + ((i * 23) % (bh * 0.26));
-          ctx.fillStyle = i % 2 === 0 ? '#94a3b8' : '#475569';
+      if (isDown) {
+        // TOP-DOWN LAYER ORDER:
+        // Top (0..34%): Coarse Gravel & Removable Pre-Filter Pad (catches mud first!)
+        if (state.layers.gravel) {
+          ctx.fillStyle = '#64748b';
+          ctx.fillRect(bx, by, bw, bh * 0.34);
+          for (let i = 0; i < 30; i++) {
+            const px = bx + 8 + ((i * 37) % (bw - 16));
+            const py = by + 7 + ((i * 17) % (bh * 0.26));
+            ctx.fillStyle = i % 2 === 0 ? '#94a3b8' : '#475569';
+            ctx.beginPath();
+            ctx.ellipse(px, py, 6.5, 4, (i % 5) * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        // Middle (34..72%): Pea Gravel + Good Bacteria
+        if (state.layers.bacteria) {
+          ctx.fillStyle = '#475569';
+          ctx.fillRect(bx, by + bh * 0.34, bw, bh * 0.38);
+          for (let i = 0; i < 42; i++) {
+            const px = bx + 6 + ((i * 29) % (bw - 12));
+            const py = by + bh * 0.38 + ((i * 15) % (bh * 0.30));
+            ctx.fillStyle = state.microscope ? '#10b981' : '#78716c';
+            ctx.beginPath();
+            ctx.arc(px, py, state.microscope ? 3.0 : 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        // Bottom (72..100%): Clean Drain Rocks (collects filtered water for outlet pipe)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(bx, by + bh * 0.72, bw, bh * 0.28);
+        for (let i = 0; i < 22; i++) {
+          const px = bx + 10 + ((i * 31) % (bw - 20));
+          const py = by + bh * 0.78 + ((i * 11) % (bh * 0.16));
+          ctx.fillStyle = '#94a3b8';
           ctx.beginPath();
-          ctx.ellipse(px, py, 7, 4.5, (i % 5) * 0.3, 0, Math.PI * 2);
+          ctx.arc(px, py, 3.5, 0, Math.PI * 2);
           ctx.fill();
+        }
+      } else {
+        // UPFLOW LAYER ORDER (Bottom -> Top):
+        if (state.layers.gravel) {
+          ctx.fillStyle = '#64748b';
+          ctx.fillRect(bx, by + bh * 0.66, bw, bh * 0.34);
+          for (let i = 0; i < 36; i++) {
+            const px = bx + 8 + ((i * 37) % (bw - 16));
+            const py = by + bh * 0.70 + ((i * 23) % (bh * 0.26));
+            ctx.fillStyle = i % 2 === 0 ? '#94a3b8' : '#475569';
+            ctx.beginPath();
+            ctx.ellipse(px, py, 7, 4.5, (i % 5) * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        if (state.layers.bacteria) {
+          ctx.fillStyle = '#475569';
+          ctx.fillRect(bx, by + bh * 0.34, bw, bh * 0.32);
+          for (let i = 0; i < 48; i++) {
+            const px = bx + 6 + ((i * 29) % (bw - 12));
+            const py = by + bh * 0.37 + ((i * 19) % (bh * 0.26));
+            ctx.fillStyle = state.microscope ? '#10b981' : '#78716c';
+            ctx.beginPath();
+            ctx.arc(px, py, state.microscope ? 3.2 : 2.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
 
-      if (state.layers.bacteria) {
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(bx, by + bh * 0.34, bw, bh * 0.32);
-        for (let i = 0; i < 48; i++) {
-          const px = bx + 6 + ((i * 29) % (bw - 12));
-          const py = by + bh * 0.37 + ((i * 19) % (bh * 0.26));
-          ctx.fillStyle = state.microscope ? '#10b981' : '#78716c';
-          ctx.beginPath();
-          ctx.arc(px, py, state.microscope ? 3.2 : 2.8, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
+      // Wetland Plants rooted in top layer (shorter reeds in Downflow so they don't overlap solar panel)
       if (state.layers.plants) {
+        const rootDepth = isDown ? bh * 0.42 : bh * 0.34;
+        const reedH = isDown ? 38 : 68;
         ctx.strokeStyle = '#d9f99d';
         ctx.lineWidth = 1.6;
         for (let i = 0; i < 6; i++) {
           const rx = bx + bw * (0.12 + i * 0.15);
           for (let r = -1; r <= 1; r++) {
             ctx.beginPath();
-            ctx.moveTo(rx, by + 6);
-            ctx.quadraticCurveTo(rx + r * 14, by + bh * 0.22, rx + r * 20, by + bh * 0.34);
+            ctx.moveTo(rx, by + 4);
+            ctx.quadraticCurveTo(rx + r * 12, by + rootDepth * 0.65, rx + r * 18, by + rootDepth);
             ctx.stroke();
           }
         }
         for (let i = 0; i < 6; i++) {
           const rx = bx + bw * (0.12 + i * 0.15);
-          const sway = Math.sin(state.time * 2 + i) * 4;
+          const sway = Math.sin(state.time * 2 + i) * 3.5;
           ctx.strokeStyle = '#16a34a';
-          ctx.lineWidth = 3.5;
+          ctx.lineWidth = 3.2;
           ctx.beginPath();
-          ctx.moveTo(rx, by + 4);
-          ctx.quadraticCurveTo(rx + sway * 0.5, by - 36, rx + sway, by - 68 - (i % 2) * 14);
+          ctx.moveTo(rx, by + 2);
+          ctx.quadraticCurveTo(rx + sway * 0.5, by - reedH * 0.55, rx + sway, by - reedH - (i % 2) * 10);
           ctx.stroke();
 
           if (i % 2 === 0) {
             ctx.fillStyle = '#78350f';
             ctx.beginPath();
-            ctx.ellipse(rx + sway * 0.85, by - 52, 4.5, 11, 0, 0, Math.PI * 2);
+            ctx.ellipse(rx + sway * 0.85, by - reedH * 0.75, 4, 9, 0, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -1568,20 +1736,36 @@
       ctx.font = 'bold 11px system-ui, sans-serif';
       ctx.textAlign = 'right';
       const labelX = bx + bw - 6;
-      if (state.layers.plants) drawTag(labelX, by + bh * 0.16, '3. Native Roots');
-      if (state.layers.bacteria) drawTag(labelX, by + bh * 0.50, '2. Good Bacteria');
-      if (state.layers.gravel) drawTag(labelX, by + bh * 0.83, '1. Coarse Gravel');
+      if (isDown) {
+        if (state.layers.gravel || state.layers.plants) drawTag(labelX, by + bh * 0.18, '1. Top Pre-Filter & Roots');
+        if (state.layers.bacteria) drawTag(labelX, by + bh * 0.53, '2. Good Bacteria');
+        drawTag(labelX, by + bh * 0.86, '3. Clean Drain Zone');
+      } else {
+        if (state.layers.plants) drawTag(labelX, by + bh * 0.16, '3. Native Roots');
+        if (state.layers.bacteria) drawTag(labelX, by + bh * 0.50, '2. Good Bacteria');
+        if (state.layers.gravel) drawTag(labelX, by + bh * 0.83, '1. Coarse Gravel');
+      }
       ctx.textAlign = 'left';
 
       const intakeX = W * 0.56, intakeY = H * 0.84;
       const pumpX = W * 0.61, pumpY = H * 0.84;
 
+      // Plumbing: Upflow goes straight into bottom; Downflow climbs up to a Top Spray Bar!
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 11;
       ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.beginPath();
-      ctx.moveTo(intakeX, intakeY);
-      ctx.lineTo(bx + bw * 0.85, intakeY);
+      if (isDown) {
+        const riserX = bx + bw + 14;
+        ctx.moveTo(intakeX, intakeY);
+        ctx.lineTo(riserX, intakeY);
+        ctx.lineTo(riserX, by - 10);
+        ctx.lineTo(bx + 12, by - 10);
+      } else {
+        ctx.moveTo(intakeX, intakeY);
+        ctx.lineTo(bx + bw * 0.85, intakeY);
+      }
       ctx.stroke();
 
       ctx.strokeStyle = state.effectiveFlow > 0.05 ? '#38bdf8' : '#475569';
@@ -1589,10 +1773,33 @@
       ctx.setLineDash(state.effectiveFlow > 0.05 ? [8, 8] : []);
       ctx.lineDashOffset = -state.flowPhase * 60;
       ctx.beginPath();
-      ctx.moveTo(intakeX, intakeY);
-      ctx.lineTo(bx + bw * 0.85, intakeY);
+      if (isDown) {
+        const riserX = bx + bw + 14;
+        ctx.moveTo(intakeX, intakeY);
+        ctx.lineTo(riserX, intakeY);
+        ctx.lineTo(riserX, by - 10);
+        ctx.lineTo(bx + 12, by - 10);
+      } else {
+        ctx.moveTo(intakeX, intakeY);
+        ctx.lineTo(bx + bw * 0.85, intakeY);
+      }
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Top Spray Bar droplets in Downflow mode
+      if (isDown) {
+        drawSmallLabel(bx + bw * 0.5, by - 22, 'TOP SPRAY BAR');
+        if (state.effectiveFlow > 0.05) {
+          ctx.fillStyle = 'rgba(125, 211, 252, 0.9)';
+          for (let d = 0; d < 7; d++) {
+            const dx = bx + 20 + d * ((bw - 40) / 6);
+            const dropOff = ((state.flowPhase * 42 + d * 5) % 14);
+            ctx.beginPath();
+            ctx.arc(dx, by - 6 + dropOff, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
 
       drawIntakeGuard(intakeX, intakeY);
 
@@ -1619,13 +1826,16 @@
       ctx.restore();
       drawSmallLabel(pumpX, pumpY + 26, 'PUMP');
 
+      // Clean Water Return Stream (Top overflow in Upflow; Bottom gravity drain in Downflow)
       if (state.effectiveFlow > 0.05) {
         const streamWidth = 6 + state.effectiveFlow * 6;
+        const outY = isDown ? (by + bh - 8) : (by + 10);
+        const splashY = lakeSurfaceY + 4;
         ctx.strokeStyle = 'rgba(125, 211, 252, 0.9)';
         ctx.lineWidth = streamWidth;
         ctx.beginPath();
-        ctx.moveTo(bx, by + 10);
-        ctx.quadraticCurveTo(W * 0.59, by + 10, W * 0.55, H * 0.49);
+        ctx.moveTo(bx, outY);
+        ctx.quadraticCurveTo(W * 0.59, outY, W * 0.55, splashY);
         ctx.stroke();
 
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
@@ -1633,14 +1843,14 @@
         ctx.setLineDash([6, 10]);
         ctx.lineDashOffset = -state.flowPhase * 85;
         ctx.beginPath();
-        ctx.moveTo(bx, by + 10);
-        ctx.quadraticCurveTo(W * 0.59, by + 10, W * 0.55, H * 0.49);
+        ctx.moveTo(bx, outY);
+        ctx.quadraticCurveTo(W * 0.59, outY, W * 0.55, splashY);
         ctx.stroke();
         ctx.setLineDash([]);
 
         for (let s = 0; s < 5; s++) {
           const sx = W * 0.55 + Math.sin(state.time * 9 + s * 1.7) * 14;
-          const sy = H * 0.49 - Math.abs(Math.cos(state.time * 8 + s)) * 10 * state.effectiveFlow;
+          const sy = splashY - Math.abs(Math.cos(state.time * 8 + s)) * 10 * state.effectiveFlow;
           ctx.fillStyle = 'rgba(224, 242, 254, 0.9)';
           ctx.beginPath();
           ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
@@ -1690,8 +1900,13 @@
 
       if (state.showArrows && state.effectiveFlow > 0.05) {
         drawFlowArrow(W * 0.47, H * 0.84, 0, 'Water IN');
-        drawFlowArrow(bx + bw * 0.35, by + bh * 0.62, -Math.PI / 2, 'Rises Up');
-        drawFlowArrow(W * 0.57, H * 0.41, Math.PI, 'Clean Stream OUT');
+        if (isDown) {
+          drawFlowArrow(bx + bw * 0.32, by + bh * 0.50, Math.PI / 2, 'Filters Down');
+          drawFlowArrow(W * 0.57, H * 0.53, Math.PI, 'Clean Drain OUT');
+        } else {
+          drawFlowArrow(bx + bw * 0.35, by + bh * 0.62, -Math.PI / 2, 'Rises Up');
+          drawFlowArrow(W * 0.57, H * 0.41, Math.PI, 'Clean Stream OUT');
+        }
       }
 
       if (state.weather === 'rainy') {
@@ -1795,12 +2010,14 @@
     }
 
     function drawSolarAndBattery(pumpX, pumpY) {
-      const sx = W * 0.76, sy = H * 0.21;
+      const isDown = state.flowMode === 'downflow';
+      const sx = W * 0.76, sy = isDown ? H * 0.14 : H * 0.21;
+      const standBottom = isDown ? H * 0.34 : H * 0.44;
       ctx.strokeStyle = '#475569';
       ctx.lineWidth = 5;
       ctx.beginPath();
       ctx.moveTo(sx, sy + 12);
-      ctx.lineTo(sx, H * 0.44);
+      ctx.lineTo(sx, standBottom);
       ctx.stroke();
 
       ctx.save();
@@ -1828,12 +2045,12 @@
         ctx.lineDashOffset = -state.solarPhase * 40;
         ctx.beginPath();
         ctx.moveTo(W * 0.22, H * 0.15);
-        ctx.lineTo(sx - 20, sy - 10);
+        ctx.lineTo(sx - 20, sy - 6);
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
-      const batX = W * 0.89, batY = H * 0.33;
+      const batX = W * 0.89, batY = isDown ? H * 0.18 : H * 0.33;
       ctx.fillStyle = state.batteryEnabled ? '#0f172a' : '#475569';
       ctx.strokeStyle = state.batteryEnabled ? '#22c55e' : '#94a3b8';
       ctx.lineWidth = 2;
@@ -1853,7 +2070,7 @@
       ctx.textAlign = 'center';
       ctx.fillText(state.batteryEnabled ? `${Math.round(state.batteryLevel)}%` : 'OFF', batX, batY + 4);
       drawSmallLabel(batX, batY - 22, 'BATTERY');
-      drawSmallLabel(sx, sy - 30, 'SOLAR PANEL');
+      drawSmallLabel(sx, sy - 27, 'SOLAR PANEL');
       ctx.textAlign = 'left';
 
       // Wire 1: Solar Panel -> Battery/Controller
@@ -1868,14 +2085,15 @@
       ctx.setLineDash([]);
 
       // Wire 2: Controller/Battery -> Pump
+      const wireMidY = isDown ? H * 0.27 : H * 0.42;
       ctx.strokeStyle = !state.pumpActive ? '#64748b' : state.onBattery ? '#22c55e' : '#facc15';
       ctx.lineWidth = 2.5;
       ctx.setLineDash(state.pumpActive ? [5, 5] : []);
       ctx.lineDashOffset = -state.flowPhase * 52;
       ctx.beginPath();
       ctx.moveTo(batX - 10, batY + 16);
-      ctx.lineTo(batX - 10, H * 0.42);
-      ctx.lineTo(pumpX, H * 0.42);
+      ctx.lineTo(batX - 10, wireMidY);
+      ctx.lineTo(pumpX, wireMidY);
       ctx.lineTo(pumpX, pumpY - 15);
       ctx.stroke();
       ctx.setLineDash([]);
